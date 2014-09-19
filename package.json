@@ -1,0 +1,28 @@
+{
+    "title": "Squarespace Server",
+    "name": "squarespace-server",
+    "description": "Node.js server for squarespace sandbox development",
+    "version": "0.1.0",
+    "dependencies": {
+        "request": "2.40.0",
+        "express": "3.4.4"
+    },
+    "main": "squarespace-server",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {},
+    "keywords": [
+        "squarespace",
+        "server"
+    ],
+    "contributors": [
+        {
+            "name": "Brandon Kitajchuk",
+            "email": "brandon.kitajchuk@weareinstrument.com",
+            "url": "http://weareinstrument.com"
+        }
+    ],
+    "license": "MIT",
+    "readmeFilename": "README.md"
+}
