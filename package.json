@@ -3,26 +3,41 @@
     "name": "squarespace-server",
     "description": "Node.js server for squarespace sandbox development",
     "version": "0.1.0",
+    "homepage": "https://github.com/kitajchuk/squarespace-server",
+    "readmeFilename": "README.md",
+    "contributors": [
+        {
+            "name": "Brandon Kitajchuk",
+            "email": "kitajchuk@gmail.com",
+            "url": "http://blkpdx.com"
+        }
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/kitajchuk/squarespace-server.git"
+    },
+    "bugs": {
+        "url": "https://github.com/kitajchuk/squarespace-server/issues"
+    },
+    "licenses": [
+        {
+            "type": "MIT",
+            "url": "https://github.com/kitajchuk/squarespace-server/blob/master/LICENSE"
+        }
+    ],
+    "main": "squarespace-server",
+    "directories": {
+        "bin": "./bin"
+    },
+    "bin": {
+        "sqs": "./bin/squarespace-server"
+    },
     "dependencies": {
         "request": "2.40.0",
         "express": "3.4.4"
     },
-    "main": "squarespace-server",
-    "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
-    "repository": {},
     "keywords": [
         "squarespace",
         "server"
-    ],
-    "contributors": [
-        {
-            "name": "Brandon Kitajchuk",
-            "email": "brandon.kitajchuk@weareinstrument.com",
-            "url": "http://weareinstrument.com"
-        }
-    ],
-    "license": "MIT",
-    "readmeFilename": "README.md"
+    ]
 }

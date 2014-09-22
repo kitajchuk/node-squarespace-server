@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+
+var fs = require( "fs" ),
+    cwd = process.cwd(),
+    args = [].slice.call( process.argv, 2 ),
+    path = require( "path" ),
+    server = require( "../squarespace-server" ),
+    config = path.join( cwd, "server.conf" );
+    config = ("" + fs.readFileSync( config ));
+    config = JSON.parse( config );
+
+server.init( config );
