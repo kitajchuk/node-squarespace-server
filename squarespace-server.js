@@ -2,17 +2,13 @@
  *
  * Squarespace node server.
  *
- * @todo: squarespace:navigation
  * @todo: squarespace:query
- * @todo: squarespace:script
  * @todo: squarespace-headers
  * @todo: squarespace-footers
  * @todo: squarespace.main-content
  * @todo: /assets/[...] - asset serving from .server dir
- * @todo: {@|apply [...].block}
  * @todo: BadFormatters
  * @todo: BadPredicates
- * @todo: server.conf for settings
  *
  */
 var express = require( "express" ),
@@ -21,16 +17,21 @@ var express = require( "express" ),
     path = require( "path" ),
     http = require( "http" ),
     fs = require( "fs" ),
-    jsont = require( "./lib/jsontemplate" ),
-    matcher = require( "./lib/matchroute" ),
+    ncp = require( "ncp" ).ncp,
+    jsontemplate = require( "./lib/jsontemplate" ),
+    matchroute = require( "./lib/matchroute" ),
 
     SS_CONTENT = "{squarespace.main-content}",
     SS_HEADERS = "{squarespace-headers}",
     SS_FOOTERS = "{squarespace-footers}",
 
+    URI_COLLECTIONS = "api/commondata/GetCollections",
+
     headers = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36" }
     server = {},
 
+    rQuote = /\'|\"/g,
+    rSlash = /\/$/g,
     rSpaces = /^\s+|\s+$/,
     r2Hundo = /^(20\d|1223)$/,
     rBlocks = /\{\@\|apply\s(.*?)\}/g,
@@ -40,7 +41,7 @@ var express = require( "express" ),
     rHeader = /header/,
     rFooter = /footer/,
     rAttrs = /(\w+)=("[^<>"]*"|'[^<>']*'|\w+)/g,
-    rQueries = /\<squarespace:query(.*?)\<\/squarespace:query\>/g,
+    rQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
     rNavis = /\<squarespace:navigation(.*?)\/\>/g,
     rScripts = /\<squarespace:script(.*?)\/\>/g,
 
@@ -55,7 +56,17 @@ more_predicates = function ( predicate_name ) {
 },
 
 more_formatters = function ( formatter_name ) {
-    
+    if ( formatter_name === "slugify" ) {
+        return function () {
+            console.log( arguments );
+        };
+    }
+},
+
+jsontopts = {
+    more_formatters: more_formatters,
+    more_predicates: more_predicates,
+    undefined_str: undefined_str
 };
 
 function readFile( path ) {
@@ -85,72 +96,34 @@ function getAttrObj( elem ) {
     for ( var i = attrs.length; i--; ) {
         var attr = attrs[ i ].split( "=" );
 
-        obj[ attr[ 0 ] ] = attr[ 1 ].replace( /\'|\"/g, "" );
+        obj[ attr[ 0 ] ] = attr[ 1 ].replace( rQuote, "" );
     }
 
     return obj;
 }
 
-/**
- *
- * siteurl: string
- * password: string
- * port: number,
- * routes: object
- * ---
- * gitroot: cwd
- * webroot: .server
- *
- */
-server.init = function ( options ) {
-    var url = options.siteurl,
-        qrs = {
-            format: "json"
-        },
+function preprocessTemplate( options ) {
+    var templateConf = JSON.parse( readFile( path.join( options.gitroot, "template.conf" ) ) ),
+        blockDir = path.join( options.gitroot, "blocks" ),
+        collectionDir = path.join( options.gitroot, "collections" ),
+        assetDir = path.join( options.gitroot, "assets" ),
+        pageDir = path.join( options.gitroot, "pages" ),
+        scriptDir = path.join( options.gitroot, "scripts" ),
+        styleDir = path.join( options.gitroot, "styles" ),
+        collections = fs.readdirSync( collectionDir ),
+        allFiles = fs.readdirSync( options.gitroot ),
+        regions = [],
+        header,
+        footer,
+        filepath,
+        template,
+        matched,
+        filed,
+        block,
+        attrs,
         len,
         i,
         j;
-
-    if ( !options.port ) {
-        options.port = 5050;
-    }
-
-    if ( options.password ) {
-        qrs.password = options.password;
-    }
-
-    if ( !options.gitroot ) {
-        options.gitroot = process.cwd();
-    }
-
-    if ( !options.webroot ) {
-        options.webroot = path.join( options.gitroot, ".server" );
-
-        if ( !fs.existsSync( options.webroot ) ) {
-            fs.mkdirSync( options.webroot );
-        }
-
-        if ( !fs.existsSync( path.join( options.webroot, "scripts" ) ) ) {
-            fs.mkdirSync( path.join( options.webroot, "scripts" ) );
-        }
-
-        if ( !fs.existsSync( path.join( options.webroot, "assets" ) ) ) {
-            fs.mkdirSync( path.join( options.webroot, "assets" ) );
-        }
-    }
-
-    var templateConf = JSON.parse( readFile( path.join( options.gitroot, "template.conf" ) ) );
-    var blockDir = path.join( options.gitroot, "blocks" );
-    var collectionDir = path.join( options.gitroot, "collections" );
-    var assetDir = path.join( options.gitroot, "assets" );
-    var pageDir = path.join( options.gitroot, "pages" );
-    var scriptDir = path.join( options.gitroot, "scripts" );
-    var styleDir = path.join( options.gitroot, "styles" );
-    var collections = fs.readdirSync( collectionDir );
-    var allFiles = fs.readdirSync( options.gitroot );
-    var regions = [];
-    var header;
-    var footer;
 
     // Header/Footer Templates
     for ( i = allFiles.length; i--; ) {
@@ -191,93 +164,227 @@ server.init = function ( options ) {
         writeFile( link, file );
     }
 
+    for ( var r in options.routes ) {
+        // File Path
+        filepath = path.join( options.webroot, options.routes[ r ] );
+
+        // Template
+        template = readFile( filepath );
+
+        // Blocks
+        matched = template.match( rBlocks );
+
+        for ( i = matched.length; i--; ) {
+            block = matched[ i ].replace( rBlockTags, "" );
+            filed = readFile( path.join( blockDir, block ) );
+
+            template = template.replace( matched[ i ], filed );
+        }
+
+        // Navigations
+        matched = template.match( rNavis );
+
+        for ( i = matched.length; i--; ) {
+            attrs = getAttrObj( matched[ i ] );
+            block = (attrs.template + ".block");
+            filed = readFile( path.join( blockDir, block ) );
+
+            template = template.replace( matched[ i ], filed );
+        }
+
+        // Scripts
+        matched = template.match( rScripts );
+
+        for ( i = matched.length; i--; ) {
+            attrs = getAttrObj( matched[ i ] );
+            block = ( "/scripts/" + attrs.src );
+            filed = '<script src="' + block + '"></script>';
+
+            template = template.replace( matched[ i ], filed );
+        }
+
+        writeFile( filepath, template );
+    }
+
+    // Copy assets + scripts to .server
+    ncp( assetDir, path.join( options.webroot, "assets" ) );
+    ncp( scriptDir, path.join( options.webroot, "scripts" ) );
+}
+
+function requestQuery( options, query, callback ) {
+    var data = getAttrObj( query[ 0 ] ),
+        qrs = {
+            format: "json"
+        };
+
+    if ( options.password ) {
+        qrs.password = options.password;
+    }
+
+    if ( data.tag ) {
+        qrs.tag = data.tag;
+    }
+
+    if ( data.category ) {
+        qrs.category = data.category;
+    }
+
+    // limit, featured...
+
+    request({
+        url: ( options.siteurl + "/" + data.collection + "/" ),
+        json: true,
+        headers: headers,
+        qs: qrs
+
+    }, function ( error, response, body ) {
+        callback( query, body );
+    });
+}
+
+/**
+ *
+ * siteurl: string
+ * password: string
+ * port: number,
+ * routes: object
+ * ---
+ * gitroot: cwd
+ * webroot: .server
+ *
+ */
+server.init = function ( options ) {
+    var queries = [],
+        completed = 0,
+        filepath = null,
+        template = null,
+        matched = null,
+        qrs = {
+            format: "json"
+        };
+
+    // Options
+    options.siteurl = options.siteurl.replace( rSlash, "" );
+
+    if ( !options.port ) {
+        options.port = 5050;
+    }
+
+    if ( options.password ) {
+        qrs.password = options.password;
+    }
+
+    if ( !options.gitroot ) {
+        options.gitroot = process.cwd();
+    }
+
+    if ( !options.webroot ) {
+        options.webroot = path.join( options.gitroot, ".server" );
+
+        if ( !fs.existsSync( options.webroot ) ) {
+            fs.mkdirSync( options.webroot );
+        }
+    }
+
+    // Preprocess templates
+    preprocessTemplate( options );
+
+    // Bind Express routing
     app.use( express.static( options.webroot ) );
     app.set( "port", options.port );
     app.get( "*", function ( req, res ) {
-        console.log( "> squarespace-server GET - " + req.url );
+        console.log( "> squarespace-server GET - " + req.params[ 0 ] );
 
+        // Merge query
+        for ( i in req.query ) {
+            qrs[ i ] = req.query[ i ];
+        }
+
+        // Request the page json
         request({
-            url: url,
+            url: (options.siteurl + req.params[ 0 ]),
             json: true,
             headers: headers,
             qs: qrs
 
         }, function ( error, response, body ) {
-            var filepath,
-                template,
-                matched,
-                filed,
-                block,
-                attrs;
-
             if ( error ) {
                 res.send( "> squarespace-server error" );
             }
 
             // Do 1xx / 2xx
             if ( r2Hundo.test( response.statusCode ) ) {
-                // For jsont processing
-                body.more_formatters = more_formatters;
-                body.more_predicates = more_predicates;
-                body.undefined_str = undefined_str;
-
                 for ( var r in options.routes ) {
-                    matched = matcher.compare( r, req.url );
+                    matched = matchroute.compare( r, req.params[ 0 ] );
 
                     // Route matched so do work
-                    if ( matched.match ) {
-                        // File Path
-                        filepath = path.join( options.webroot, options.routes[ r ] );
+                    if ( matched.matched ) {
+                        // Honor ?format=json, send response as json
+                        if ( req.query.format === "json" ) {
+                            res.status( 200 ).json( body );
 
-                        // Template
-                        template = readFile( filepath );
+                        // Send the response as html
+                        } else {
+                            // File Path
+                            filepath = path.join( options.webroot, options.routes[ r ] );
 
-                        // Blocks
-                        matched = template.match( rBlocks );
+                            // Template
+                            template = readFile( filepath );
 
-                        for ( i = matched.length; i--; ) {
-                            block = matched[ i ].replace( rBlockTags, "" );
-                            filed = readFile( path.join( blockDir, block ) );
+                            // Queries
+                            // 0 => Full
+                            // 1 => Open
+                            // 2 => Template
+                            // 3 => Close
+                            while ( matched = template.match( rQuery ) ) {
+                                template = template.replace( matched[ 0 ], matched[ 2 ] );
 
-                            template = template.replace( matched[ i ], filed );
+                                queries.push( matched );
+                            }
+
+                            function handleQueried( query, json ) {
+                                var items = [],
+                                    data;
+
+                                if ( !queries.length ) {
+                                    console.log( "> squarespace-server queries finished" );
+                                    return;
+
+                                } else if ( query && json ) {
+                                    data = getAttrObj( query[ 0 ] );
+
+                                    if ( data.featured ) {
+                                        for ( i = 0, len = json.items.length; i < len; i++ ) {
+                                            if ( json.items[ i ].starred ) {
+                                                items.push( json.items[ i ] );
+                                            }
+                                        }
+
+                                        json.items = items;
+                                    }
+
+                                    if ( data.limit ) {
+                                        json.items.splice( 0, (json.items.length - data.limit) );
+                                    }
+                                    
+                                    // replace query[ 2 ] with rendered jsontemplate
+                                    var jsont = jsontemplate.expand( query[ 2 ], json, jsontopts );
+
+                                    template = template.replace( query[ 2 ], jsont );
+                                }
+
+                                requestQuery( options, queries.pop(), handleQueried );
+                            }
+
+                            //handleQueried();
+
+                            // Render w/jsontemplate
+                            template = jsontemplate.expand( template, body, jsontopts );
+
+                            res.status( 200 ).send( template );
                         }
-
-                        // Navigations
-                        matched = template.match( rNavis );
-
-                        for ( i = matched.length; i--; ) {
-                            attrs = getAttrObj( matched[ i ] );
-                            block = (attrs.template + ".block");
-                            filed = readFile( path.join( blockDir, block ) );
-
-                            template = template.replace( matched[ i ], filed );
-                        }
-
-                        // Scripts
-                        matched = template.match( rScripts );
-
-                        for ( i = matched.length; i--; ) {
-                            attrs = getAttrObj( matched[ i ] );
-                            block = ( "/scripts/" + attrs.src );
-                            filed = '<script src="' + block + '"></script>';
-
-                            template = template.replace( matched[ i ], filed );
-
-                            // Copy file to .server/scripts/[block]
-                        }
-
-                        // Queries
-                        matched = template.match( rQueries );
-                        console.log( "Queries" );
-                        console.log( matched );
-                        console.log( "" );
-
-                        // Render w/jsontemplate
-
                     }
                 }
-
-                res.status( 200 ).send( template );
 
             // Do 4xx / 5xx
             } else {
