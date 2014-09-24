@@ -3,10 +3,12 @@
  * Squarespace node server.
  *
  * @todo: squarespace:query
+ * @todo: squarespace:block
  * @todo: squarespace-headers
  * @todo: squarespace-footers
  * @todo: squarespace.main-content
- * @todo: /assets/[...] - asset serving from .server dir
+ * @todo: squarespace.page-classes
+ * @todo: squarespace.page-id
  * @todo: BadFormatters
  * @todo: BadPredicates
  *
@@ -18,56 +20,162 @@ var express = require( "express" ),
     http = require( "http" ),
     fs = require( "fs" ),
     ncp = require( "ncp" ).ncp,
-    jsontemplate = require( "./lib/jsontemplate" ),
-    matchroute = require( "./lib/matchroute" ),
-
-    SS_CONTENT = "{squarespace.main-content}",
-    SS_HEADERS = "{squarespace-headers}",
-    SS_FOOTERS = "{squarespace-footers}",
-
-    URI_COLLECTIONS = "api/commondata/GetCollections",
-
-    headers = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36" }
-    server = {},
+    jsonTemplate = require( "./lib/jsontemplate" ),
+    matchRoute = require( "./lib/matchroute" ),
 
     rQuote = /\'|\"/g,
     rSlash = /\/$/g,
     rSpaces = /^\s+|\s+$/,
     r2Hundo = /^(20\d|1223)$/,
-    rBlocks = /\{\@\|apply\s(.*?)\}/g,
-    rBlockTags = /^\{\@\|apply\s|\}$/g,
-    rRegion = /\.region$/,
-    rItemOrList = /\.item$|\.list$/,
     rHeader = /header/,
     rFooter = /footer/,
     rAttrs = /(\w+)=("[^<>"]*"|'[^<>']*'|\w+)/g,
-    rQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
-    rNavis = /\<squarespace:navigation(.*?)\/\>/g,
-    rScripts = /\<squarespace:script(.*?)\/\>/g,
 
-undefined_str = "",
+    rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
+    rBlockTags = /^\{\@\|apply\s|\}$/g,
+    rRegions = /\.region$/,
+    rItemOrList = /\.item$|\.list$/,
 
-more_predicates = function ( predicate_name ) {
-    if ( predicate_name === "authenticatedAccount" ) {
-        return function () {
-            return false;
-        };
-    }
-},
+    // Squarespace content
+    rSQSQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
+    rSQSNavis = /\<squarespace:navigation(.*?)\/\>/g,
+    rSQSBlockFields = /\<squarespace:block(.*?)\/\>/g,
+    rSQSScripts = /\<squarespace:script(.*?)\/\>/g,
 
-more_formatters = function ( formatter_name ) {
-    if ( formatter_name === "slugify" ) {
-        return function () {
-            console.log( arguments );
-        };
-    }
-},
+    // collectionId=hash
+    API_COLLECTION = "api/commondata/GetCollection",
+    API_COLLECTIONS = "api/commondata/GetCollections",
+    API_SITE_LAYOUT = "api/commondata/GetSiteLayout",
 
-jsontopts = {
-    more_formatters: more_formatters,
-    more_predicates: more_predicates,
-    undefined_str: undefined_str
-};
+    SQS_HEADERS = "{squarespace-headers}",
+    SQS_FOOTERS = "{squarespace-footers}",
+    SQS_MAIN_CONTENT = "{squarespace.main-content}",
+    SQS_PAGE_CLASSES = "{squarespace.page-classes}",
+    SQS_PAGE_ID = "{squarespace.page-id}",
+    SQS_POST_ENTRY = "{squarespace-post-entry}",
+
+    sqsFormatters = [
+        "item-classes",
+        "social-button",
+        "comments",
+        "comment-link",
+        "comment-count",
+        "like-button",
+        "image-meta",
+        "product-price",
+        "product-status",
+
+        "json",
+        "json-pretty",
+        "slugify",
+        "url-encode",
+        //"html",
+        "htmlattr",
+        "activate-twitter-links",
+        "safe"
+    ],
+
+    sqsPredicates = [
+        "main-image?",
+        "excerpt?",
+        "comments?",
+        "disqus?",
+        "video?",
+        "even?",
+        "odd?",
+        "equal?",
+        "collection?",
+        "external-link?",
+        "folder?"
+    ],
+
+    sqsUrlQueries = [
+        "format",
+        "category",
+        "tag",
+        "month"
+    ],
+
+    jsontFormatters = [
+        "html",
+        "htmltag",
+        "html-attr-value",
+        "str",
+        "raw",
+        "AbsUrl",
+        "plain-url"
+    ],
+
+    jsontPredicates = [
+        "singular",
+        "plural",
+        "singular?",
+        "plural?",
+        "Debug?"
+    ],
+
+    undefined_str = "",
+    
+    more_predicates = function ( predicate_name ) {
+        var match = false;
+
+        for ( var i = sqsPredicates.length; i--; ) {
+            if ( predicate_name === sqsPredicates[ i ] ) {
+                match = true;
+                break;
+            }
+        }
+
+        if ( match || (jsontPredicates.indexOf( predicate_name ) === -1) ) {
+            return function ( data, ctx ) {
+                var split = predicate_name.split( " " ),
+                    pred = split[ 0 ],
+                    arg = split[ 1 ],
+                    ret = false;
+
+                if ( pred === "odd?" ) {
+                    ret = !(ctx._LookUpStack( arg ) % 2 == 0);
+
+                } else if ( pred === "even?" ) {
+                    ret = (ctx._LookUpStack( arg ) % 2 == 0);
+
+                // .if variable...
+                } else {
+                    ret = ctx.get( predicate_name );
+                }
+
+                return ret;
+            };
+        }
+    },
+
+    more_formatters = function ( formatter_name ) {
+        var match = false;
+
+        for ( var i = sqsFormatters.length; i--; ) {
+            if ( formatter_name === sqsFormatters[ i ] ) {
+                match = true;
+                break;
+            }
+        }
+
+        if ( match || (jsontFormatters.indexOf( formatter_name ) === -1) ) {
+            return function () {
+                //console.log( formatter_name, arguments );
+                return "";
+            };
+        }
+    },
+
+    jsontOptions = {
+        more_formatters: more_formatters,
+        more_predicates: more_predicates,
+        undefined_str: undefined_str
+    },
+
+    headers = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36" },
+
+    server = {};
 
 function readFile( path ) {
     var content;
@@ -102,7 +210,7 @@ function getAttrObj( elem ) {
     return obj;
 }
 
-function preprocessTemplate( options ) {
+function preprocessTemplates( options ) {
     var templateConf = JSON.parse( readFile( path.join( options.gitroot, "template.conf" ) ) ),
         blockDir = path.join( options.gitroot, "blocks" ),
         collectionDir = path.join( options.gitroot, "collections" ),
@@ -127,10 +235,10 @@ function preprocessTemplate( options ) {
 
     // Header/Footer Templates
     for ( i = allFiles.length; i--; ) {
-        if ( rRegion.test( allFiles[ i ] ) && rHeader.test( allFiles[ i ] ) ) {
+        if ( rRegions.test( allFiles[ i ] ) && rHeader.test( allFiles[ i ] ) ) {
             header = path.join( options.gitroot, allFiles[ i ] );
 
-        } else if ( rRegion.test( allFiles[ i ] ) && rFooter.test( allFiles[ i ] ) ) {
+        } else if ( rRegions.test( allFiles[ i ] ) && rFooter.test( allFiles[ i ] ) ) {
             footer = path.join( options.gitroot, allFiles[ i ] );
         }
     }
@@ -172,9 +280,9 @@ function preprocessTemplate( options ) {
         template = readFile( filepath );
 
         // Blocks
-        matched = template.match( rBlocks );
+        matched = template.match( rBlockIncs );
 
-        for ( i = matched.length; i--; ) {
+        for ( i = 0, len = matched.length; i < len; i++ ) {
             block = matched[ i ].replace( rBlockTags, "" );
             filed = readFile( path.join( blockDir, block ) );
 
@@ -182,9 +290,9 @@ function preprocessTemplate( options ) {
         }
 
         // Navigations
-        matched = template.match( rNavis );
+        matched = template.match( rSQSNavis );
 
-        for ( i = matched.length; i--; ) {
+        for ( i = 0, len = matched.length; i < len; i++ ) {
             attrs = getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
             filed = readFile( path.join( blockDir, block ) );
@@ -193,15 +301,23 @@ function preprocessTemplate( options ) {
         }
 
         // Scripts
-        matched = template.match( rScripts );
+        matched = template.match( rSQSScripts );
 
-        for ( i = matched.length; i--; ) {
+        for ( i = 0, len = matched.length; i < len; i++ ) {
             attrs = getAttrObj( matched[ i ] );
             block = ( "/scripts/" + attrs.src );
             filed = '<script src="' + block + '"></script>';
 
             template = template.replace( matched[ i ], filed );
         }
+
+        // Squarespace Tags
+        template = template.replace( SQS_HEADERS, "" );
+        template = template.replace( SQS_FOOTERS, "" );
+        template = template.replace( SQS_MAIN_CONTENT, "" );
+        template = template.replace( SQS_PAGE_CLASSES, "" );
+        template = template.replace( SQS_PAGE_ID, "" );
+        template = template.replace( SQS_POST_ENTRY, "" );
 
         writeFile( filepath, template );
     }
@@ -212,10 +328,12 @@ function preprocessTemplate( options ) {
 }
 
 function requestQuery( options, query, callback ) {
-    var data = getAttrObj( query[ 0 ] ),
+    var data = getAttrObj( query[ 1 ] ),
         qrs = {
             format: "json"
         };
+
+    console.log( "query data", data );
 
     if ( options.password ) {
         qrs.password = options.password;
@@ -229,8 +347,6 @@ function requestQuery( options, query, callback ) {
         qrs.category = data.category;
     }
 
-    // limit, featured...
-
     request({
         url: ( options.siteurl + "/" + data.collection + "/" ),
         json: true,
@@ -238,7 +354,7 @@ function requestQuery( options, query, callback ) {
         qs: qrs
 
     }, function ( error, response, body ) {
-        callback( query, body );
+        callback( query, data, body );
     });
 }
 
@@ -254,24 +370,25 @@ function requestQuery( options, query, callback ) {
  *
  */
 server.init = function ( options ) {
-    var queries = [],
-        completed = 0,
-        filepath = null,
-        template = null,
-        matched = null,
-        qrs = {
-            format: "json"
-        };
+    request({
+        url: "https://instrument.squarespace.com/api/auth/Login",
+        headers: headers,
+        method: "POST",
+        form: {
+            email: "kitajchuk@gmail.com",
+            password: "sunboxnine99"
+        }
 
+    }, function ( error, response, body ) {
+        console.log( arguments );
+    });
+    return;
+    
     // Options
     options.siteurl = options.siteurl.replace( rSlash, "" );
 
     if ( !options.port ) {
         options.port = 5050;
-    }
-
-    if ( options.password ) {
-        qrs.password = options.password;
     }
 
     if ( !options.gitroot ) {
@@ -287,13 +404,26 @@ server.init = function ( options ) {
     }
 
     // Preprocess templates
-    preprocessTemplate( options );
+    preprocessTemplates( options );
 
     // Bind Express routing
     app.use( express.static( options.webroot ) );
     app.set( "port", options.port );
     app.get( "*", function ( req, res ) {
+        var queries = [],
+            filepath = null,
+            template = null,
+            matched = null,
+            qrs = {
+                format: "json"
+            };
+
         console.log( "> squarespace-server GET - " + req.params[ 0 ] );
+
+        // Password
+        if ( options.password ) {
+            qrs.password = options.password;
+        }
 
         // Merge query
         for ( i in req.query ) {
@@ -315,7 +445,7 @@ server.init = function ( options ) {
             // Do 1xx / 2xx
             if ( r2Hundo.test( response.statusCode ) ) {
                 for ( var r in options.routes ) {
-                    matched = matchroute.compare( r, req.params[ 0 ] );
+                    matched = matchRoute.compare( r, req.params[ 0 ] );
 
                     // Route matched so do work
                     if ( matched.matched ) {
@@ -328,6 +458,8 @@ server.init = function ( options ) {
                             // File Path
                             filepath = path.join( options.webroot, options.routes[ r ] );
 
+                            console.log( "> squarespace-server TEMPLATE - " + options.routes[ r ] );
+
                             // Template
                             template = readFile( filepath );
 
@@ -336,22 +468,26 @@ server.init = function ( options ) {
                             // 1 => Open
                             // 2 => Template
                             // 3 => Close
-                            while ( matched = template.match( rQuery ) ) {
+                            while ( matched = template.match( rSQSQuery ) ) {
                                 template = template.replace( matched[ 0 ], matched[ 2 ] );
 
                                 queries.push( matched );
                             }
 
-                            function handleQueried( query, json ) {
+                            function handleDone() {
+                                // Render w/jsontemplate
+                                template = jsonTemplate.Template( template, jsontOptions );
+                                template = template.expand( body );
+
+                                res.status( 200 ).send( template );
+                            }
+
+                            function handleQueried( query, data, json ) {
                                 var items = [],
-                                    data;
+                                    tpl;
 
-                                if ( !queries.length ) {
-                                    console.log( "> squarespace-server queries finished" );
-                                    return;
-
-                                } else if ( query && json ) {
-                                    data = getAttrObj( query[ 0 ] );
+                                if ( query && data && json ) {
+                                    console.log( "query json", json.items.length );
 
                                     if ( data.featured ) {
                                         for ( i = 0, len = json.items.length; i < len; i++ ) {
@@ -366,22 +502,29 @@ server.init = function ( options ) {
                                     if ( data.limit ) {
                                         json.items.splice( 0, (json.items.length - data.limit) );
                                     }
-                                    
-                                    // replace query[ 2 ] with rendered jsontemplate
-                                    var jsont = jsontemplate.expand( query[ 2 ], json, jsontopts );
 
-                                    template = template.replace( query[ 2 ], jsont );
+                                    tpl = jsonTemplate.Template( query[ 2 ], jsontOptions );
+                                    tpl = tpl.expand( json );
+
+                                    template = template.replace( query[ 2 ], tpl );
                                 }
 
-                                requestQuery( options, queries.pop(), handleQueried );
+                                if ( queries.length ) {
+                                    requestQuery( options, queries.shift(), handleQueried );
+
+                                } else {
+                                    console.log( "> squarespace-server queries finished" );
+
+                                    handleDone();
+                                }
                             }
 
-                            //handleQueried();
+                            if ( queries.length ) {
+                                handleQueried();
 
-                            // Render w/jsontemplate
-                            template = jsontemplate.expand( template, body, jsontopts );
-
-                            res.status( 200 ).send( template );
+                            } else {
+                                handleDone();
+                            }
                         }
                     }
                 }
