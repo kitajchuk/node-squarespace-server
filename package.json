@@ -33,9 +33,12 @@
         "sqs": "./bin/squarespace-server"
     },
     "dependencies": {
-        "request": "2.40.0",
-        "express": "3.4.4",
-        "ncp": "~0.6"
+        "request": "~2",
+        "express": "~4.9",
+        "ncp": "~0.6",
+        "slug": "~0.7",
+        "http-proxy": "~1.4",
+        "tunnel": "0.0.3"
     },
     "keywords": [
         "squarespace",

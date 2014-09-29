@@ -4,11 +4,13 @@
  *
  * @todo: squarespace:query
  * @todo: squarespace:block
+ * @todo: squarespace:navigation
  * @todo: squarespace-headers
  * @todo: squarespace-footers
  * @todo: squarespace.main-content
  * @todo: squarespace.page-classes
  * @todo: squarespace.page-id
+ * @todo: <script></script>
  * @todo: BadFormatters
  * @todo: BadPredicates
  *
@@ -18,10 +20,14 @@ var express = require( "express" ),
     app = express(),
     path = require( "path" ),
     http = require( "http" ),
+    https = require( "https" ),
+    httpProxy = require( "http-proxy" ),
+    tunnel = require( "tunnel" ),
     fs = require( "fs" ),
     ncp = require( "ncp" ).ncp,
     jsonTemplate = require( "./lib/jsontemplate" ),
     matchRoute = require( "./lib/matchroute" ),
+    functions = require( "./lib/functions" ),
 
     rQuote = /\'|\"/g,
     rSlash = /\/$/g,
@@ -30,6 +36,7 @@ var express = require( "express" ),
     rHeader = /header/,
     rFooter = /footer/,
     rAttrs = /(\w+)=("[^<>"]*"|'[^<>']*'|\w+)/g,
+    rScripts = /\<script\>(.*?)\<\/script\>/g,
 
     rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
     rBlockTags = /^\{\@\|apply\s|\}$/g,
@@ -46,6 +53,7 @@ var express = require( "express" ),
     API_COLLECTION = "api/commondata/GetCollection",
     API_COLLECTIONS = "api/commondata/GetCollections",
     API_SITE_LAYOUT = "api/commondata/GetSiteLayout",
+    API_TEMPLATE = "api/commondata/GetTemplate",
 
     SQS_HEADERS = "{squarespace-headers}",
     SQS_FOOTERS = "{squarespace-footers}",
@@ -54,41 +62,6 @@ var express = require( "express" ),
     SQS_PAGE_ID = "{squarespace.page-id}",
     SQS_POST_ENTRY = "{squarespace-post-entry}",
 
-    sqsFormatters = [
-        "item-classes",
-        "social-button",
-        "comments",
-        "comment-link",
-        "comment-count",
-        "like-button",
-        "image-meta",
-        "product-price",
-        "product-status",
-
-        "json",
-        "json-pretty",
-        "slugify",
-        "url-encode",
-        //"html",
-        "htmlattr",
-        "activate-twitter-links",
-        "safe"
-    ],
-
-    sqsPredicates = [
-        "main-image?",
-        "excerpt?",
-        "comments?",
-        "disqus?",
-        "video?",
-        "even?",
-        "odd?",
-        "equal?",
-        "collection?",
-        "external-link?",
-        "folder?"
-    ],
-
     sqsUrlQueries = [
         "format",
         "category",
@@ -96,76 +69,9 @@ var express = require( "express" ),
         "month"
     ],
 
-    jsontFormatters = [
-        "html",
-        "htmltag",
-        "html-attr-value",
-        "str",
-        "raw",
-        "AbsUrl",
-        "plain-url"
-    ],
-
-    jsontPredicates = [
-        "singular",
-        "plural",
-        "singular?",
-        "plural?",
-        "Debug?"
-    ],
-
     undefined_str = "",
-    
-    more_predicates = function ( predicate_name ) {
-        var match = false;
-
-        for ( var i = sqsPredicates.length; i--; ) {
-            if ( predicate_name === sqsPredicates[ i ] ) {
-                match = true;
-                break;
-            }
-        }
-
-        if ( match || (jsontPredicates.indexOf( predicate_name ) === -1) ) {
-            return function ( data, ctx ) {
-                var split = predicate_name.split( " " ),
-                    pred = split[ 0 ],
-                    arg = split[ 1 ],
-                    ret = false;
-
-                if ( pred === "odd?" ) {
-                    ret = !(ctx._LookUpStack( arg ) % 2 == 0);
-
-                } else if ( pred === "even?" ) {
-                    ret = (ctx._LookUpStack( arg ) % 2 == 0);
-
-                // .if variable...
-                } else {
-                    ret = ctx.get( predicate_name );
-                }
-
-                return ret;
-            };
-        }
-    },
-
-    more_formatters = function ( formatter_name ) {
-        var match = false;
-
-        for ( var i = sqsFormatters.length; i--; ) {
-            if ( formatter_name === sqsFormatters[ i ] ) {
-                match = true;
-                break;
-            }
-        }
-
-        if ( match || (jsontFormatters.indexOf( formatter_name ) === -1) ) {
-            return function () {
-                //console.log( formatter_name, arguments );
-                return "";
-            };
-        }
-    },
+    more_predicates = require( "./lib/predicates" ),
+    more_formatters = require( "./lib/formatters" ),
 
     jsontOptions = {
         more_formatters: more_formatters,
@@ -173,45 +79,24 @@ var express = require( "express" ),
         undefined_str: undefined_str
     },
 
-    headers = { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36" },
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36",
+    },
 
-    server = {};
+    server = {},
 
-function readFile( path ) {
-    var content;
+    cache = {},
 
-    content = ("" + fs.readFileSync( path )).split( "\n" );
-    content.forEach(function ( el, i ) {
-        content[ i ] = el.replace( rSpaces, "" );
-    });
-    content = content.join( "" );
+    scripts = [];
 
-    return content;
+
+function getToken() {
+    return ("token-" + Date.now() + ("" + Math.floor( (Math.random() * 1000000) + 1 )));
 }
 
-function writeFile( path, content ) {
-    if ( fs.existsSync( path ) ) {
-        fs.unlinkSync( path );
-    }
-
-    fs.writeFileSync( path, content );
-}
-
-function getAttrObj( elem ) {
-    var attrs = elem.match( rAttrs ),
-        obj = {};
-
-    for ( var i = attrs.length; i--; ) {
-        var attr = attrs[ i ].split( "=" );
-
-        obj[ attr[ 0 ] ] = attr[ 1 ].replace( rQuote, "" );
-    }
-
-    return obj;
-}
 
 function preprocessTemplates( options ) {
-    var templateConf = JSON.parse( readFile( path.join( options.gitroot, "template.conf" ) ) ),
+    var templateConf = JSON.parse( functions.readFile( path.join( options.gitroot, "template.conf" ) ) ),
         blockDir = path.join( options.gitroot, "blocks" ),
         collectionDir = path.join( options.gitroot, "collections" ),
         assetDir = path.join( options.gitroot, "assets" ),
@@ -252,10 +137,10 @@ function preprocessTemplates( options ) {
             var files = [header, file, footer];
 
             for ( j = 0, len = files.length; j < len; j++ ) {
-                cont += readFile( files[ j ] );
+                cont += functions.readFile( files[ j ] );
             }
 
-            writeFile( link, cont );
+            functions.writeFile( link, cont );
         }
     }
 
@@ -266,10 +151,10 @@ function preprocessTemplates( options ) {
         var link = path.join( options.webroot, (templateConf.layouts[ i ].name.toLowerCase() + ".region") );
 
         for ( j = 0, len = files.length; j < len; j++ ) {
-            file += readFile( path.join( options.gitroot, (files[ j ] + ".region") ) );
+            file += functions.readFile( path.join( options.gitroot, (files[ j ] + ".region") ) );
         }
 
-        writeFile( link, file );
+        functions.writeFile( link, file );
     }
 
     for ( var r in options.routes ) {
@@ -277,34 +162,36 @@ function preprocessTemplates( options ) {
         filepath = path.join( options.webroot, options.routes[ r ] );
 
         // Template
-        template = readFile( filepath );
+        template = functions.readFile( filepath );
 
-        // Blocks
+        // SQS Blocks
         matched = template.match( rBlockIncs );
 
         for ( i = 0, len = matched.length; i < len; i++ ) {
             block = matched[ i ].replace( rBlockTags, "" );
-            filed = readFile( path.join( blockDir, block ) );
+            filed = functions.readFile( path.join( blockDir, block ) );
 
             template = template.replace( matched[ i ], filed );
         }
 
-        // Navigations
-        matched = template.match( rSQSNavis );
+        // Plain Scripts, will be added back after all parsing
+        matched = template.match( rScripts );
 
         for ( i = 0, len = matched.length; i < len; i++ ) {
-            attrs = getAttrObj( matched[ i ] );
-            block = (attrs.template + ".block");
-            filed = readFile( path.join( blockDir, block ) );
+            token = getToken();
+            scripts.push({
+                token: token,
+                script: matched[ i ]
+            });
 
-            template = template.replace( matched[ i ], filed );
+            template = template.replace( matched[ i ], token );
         }
 
-        // Scripts
+        // SQS Scripts
         matched = template.match( rSQSScripts );
 
         for ( i = 0, len = matched.length; i < len; i++ ) {
-            attrs = getAttrObj( matched[ i ] );
+            attrs = functions.getAttrObj( matched[ i ] );
             block = ( "/scripts/" + attrs.src );
             filed = '<script src="' + block + '"></script>';
 
@@ -319,7 +206,7 @@ function preprocessTemplates( options ) {
         template = template.replace( SQS_PAGE_ID, "" );
         template = template.replace( SQS_POST_ENTRY, "" );
 
-        writeFile( filepath, template );
+        functions.writeFile( filepath, template );
     }
 
     // Copy assets + scripts to .server
@@ -327,13 +214,60 @@ function preprocessTemplates( options ) {
     ncp( scriptDir, path.join( options.webroot, "scripts" ) );
 }
 
+
+function requestJsonAndHtml( options, url, callback ) {
+    var urls = [url, url],
+        res = {};
+
+    function makeRequest() {
+        var qrs = {},
+            json = (urls.length === 2) ? true : false;
+
+        if ( options.password ) {
+            qrs.password = options.password;
+        }
+
+        if ( json ) {
+            qrs.format = "json";
+        }
+
+        request({
+            url: urls.pop(),
+            json: json,
+            headers: headers,
+            qs: qrs
+
+        }, function ( error, response, data ) {
+            if ( error ) {
+                functions.clog( error );
+                return;
+            }
+
+            if ( json ) {
+                res.json = data;
+
+            } else {
+                res.html = data;
+            }
+
+            if ( urls.length ) {
+                makeRequest();
+
+            } else {
+                callback( res );
+            }
+        });
+    }
+
+    makeRequest();
+}
+
+
 function requestQuery( options, query, callback ) {
-    var data = getAttrObj( query[ 1 ] ),
+    var data = functions.getAttrObj( query[ 1 ] ),
         qrs = {
             format: "json"
         };
-
-    console.log( "query data", data );
 
     if ( options.password ) {
         qrs.password = options.password;
@@ -358,6 +292,98 @@ function requestQuery( options, query, callback ) {
     });
 }
 
+
+function compileTemplate( options, reqUri, pageJson, pageHtml, callback ) {
+    var queries = [],
+        filepath = null,
+        template = null,
+        matched = null,
+        qrs = {
+            format: "json"
+        };
+
+    for ( var r in options.routes ) {
+        matched = matchRoute.compare( r, reqUri );
+
+        if ( matched.matched ) {
+            // File Path
+            filepath = path.join( options.webroot, options.routes[ r ] );
+
+            functions.clog( "TEMPLATE - " + options.routes[ r ] );
+
+            // Template
+            template = functions.readFile( filepath );
+
+            // Queries
+            // 0 => Full
+            // 1 => Open
+            // 2 => Template
+            // 3 => Close
+            while ( matched = template.match( rSQSQuery ) ) {
+                template = template.replace( matched[ 0 ], matched[ 2 ] );
+
+                queries.push( matched );
+            }
+
+            function handleDone() {
+                // Render w/jsontemplate
+                template = jsonTemplate.Template( template, jsontOptions );
+                template = template.expand( pageJson );
+
+                // Add token scripts back
+                for ( var i = scripts.length; i--; ) {
+                    template = template.replace( scripts[ i ].token, scripts[ i ].script );
+                }
+
+                callback( template );
+            }
+
+            function handleQueried( query, data, json ) {
+                var items = [],
+                    tpl;
+
+                if ( query && data && json ) {
+                    if ( data.featured ) {
+                        for ( i = 0, len = json.items.length; i < len; i++ ) {
+                            if ( json.items[ i ].starred ) {
+                                items.push( json.items[ i ] );
+                            }
+                        }
+
+                        json.items = items;
+                    }
+
+                    if ( data.limit ) {
+                        json.items.splice( 0, (json.items.length - data.limit) );
+                    }
+
+                    tpl = jsonTemplate.Template( query[ 2 ], jsontOptions );
+                    tpl = tpl.expand( json );
+
+                    template = template.replace( query[ 2 ], tpl );
+                }
+
+                if ( queries.length ) {
+                    requestQuery( options, queries.shift(), handleQueried );
+
+                } else {
+                    functions.clog( "Queries finished" );
+
+                    handleDone();
+                }
+            }
+
+            if ( queries.length ) {
+                handleQueried();
+
+            } else {
+                handleDone();
+            }
+        }
+    }
+}
+
+
 /**
  *
  * siteurl: string
@@ -370,20 +396,10 @@ function requestQuery( options, query, callback ) {
  *
  */
 server.init = function ( options ) {
-    request({
-        url: "https://instrument.squarespace.com/api/auth/Login",
-        headers: headers,
-        method: "POST",
-        form: {
-            email: "kitajchuk@gmail.com",
-            password: "sunboxnine99"
-        }
+    if ( !options ) {
+        throw new Error( "You need options, son!" );
+    }
 
-    }, function ( error, response, body ) {
-        console.log( arguments );
-    });
-    return;
-    
     // Options
     options.siteurl = options.siteurl.replace( rSlash, "" );
 
@@ -403,22 +419,19 @@ server.init = function ( options ) {
         }
     }
 
-    // Preprocess templates
-    preprocessTemplates( options );
-
     // Bind Express routing
     app.use( express.static( options.webroot ) );
     app.set( "port", options.port );
-    app.get( "*", function ( req, res ) {
-        var queries = [],
-            filepath = null,
-            template = null,
-            matched = null,
+    app.get( "*", function ( appRequest, appResponse ) {
+        var cached = cache[ appRequest.params[ 0 ] ],
             qrs = {
                 format: "json"
             };
 
-        console.log( "> squarespace-server GET - " + req.params[ 0 ] );
+        functions.clog( "GET - " + appRequest.params[ 0 ] );
+
+        // Preprocess templates here to capture local template edits
+        preprocessTemplates( options );
 
         // Password
         if ( options.password ) {
@@ -426,119 +439,41 @@ server.init = function ( options ) {
         }
 
         // Merge query
-        for ( i in req.query ) {
-            qrs[ i ] = req.query[ i ];
+        for ( i in appRequest.query ) {
+            qrs[ i ] = appRequest.query[ i ];
         }
 
-        // Request the page json
-        request({
-            url: (options.siteurl + req.params[ 0 ]),
-            json: true,
-            headers: headers,
-            qs: qrs
+        // Check the cache
+        if ( cached ) {
+            compileTemplate( options, appRequest.params[ 0 ], cached.json, cached.html, function ( tpl ) {
+                appResponse.status( 200 ).send( tpl );
+            });
 
-        }, function ( error, response, body ) {
-            if ( error ) {
-                res.send( "> squarespace-server error" );
-            }
+            functions.clog( "Loading request from cache" );
 
-            // Do 1xx / 2xx
-            if ( r2Hundo.test( response.statusCode ) ) {
-                for ( var r in options.routes ) {
-                    matched = matchRoute.compare( r, req.params[ 0 ] );
+            return;
+        }
 
-                    // Route matched so do work
-                    if ( matched.matched ) {
-                        // Honor ?format=json, send response as json
-                        if ( req.query.format === "json" ) {
-                            res.status( 200 ).json( body );
+        // Get JSON and HMTL for the page requested, we need it :-(
+        requestJsonAndHtml( options, (options.siteurl + appRequest.params[ 0 ]), function ( data ) {
+            // Honor ?format=json, send response as json
+            if ( appRequest.query.format === "json" ) {
+                appResponse.status( 200 ).json( data.json );
 
-                        // Send the response as html
-                        } else {
-                            // File Path
-                            filepath = path.join( options.webroot, options.routes[ r ] );
-
-                            console.log( "> squarespace-server TEMPLATE - " + options.routes[ r ] );
-
-                            // Template
-                            template = readFile( filepath );
-
-                            // Queries
-                            // 0 => Full
-                            // 1 => Open
-                            // 2 => Template
-                            // 3 => Close
-                            while ( matched = template.match( rSQSQuery ) ) {
-                                template = template.replace( matched[ 0 ], matched[ 2 ] );
-
-                                queries.push( matched );
-                            }
-
-                            function handleDone() {
-                                // Render w/jsontemplate
-                                template = jsonTemplate.Template( template, jsontOptions );
-                                template = template.expand( body );
-
-                                res.status( 200 ).send( template );
-                            }
-
-                            function handleQueried( query, data, json ) {
-                                var items = [],
-                                    tpl;
-
-                                if ( query && data && json ) {
-                                    console.log( "query json", json.items.length );
-
-                                    if ( data.featured ) {
-                                        for ( i = 0, len = json.items.length; i < len; i++ ) {
-                                            if ( json.items[ i ].starred ) {
-                                                items.push( json.items[ i ] );
-                                            }
-                                        }
-
-                                        json.items = items;
-                                    }
-
-                                    if ( data.limit ) {
-                                        json.items.splice( 0, (json.items.length - data.limit) );
-                                    }
-
-                                    tpl = jsonTemplate.Template( query[ 2 ], jsontOptions );
-                                    tpl = tpl.expand( json );
-
-                                    template = template.replace( query[ 2 ], tpl );
-                                }
-
-                                if ( queries.length ) {
-                                    requestQuery( options, queries.shift(), handleQueried );
-
-                                } else {
-                                    console.log( "> squarespace-server queries finished" );
-
-                                    handleDone();
-                                }
-                            }
-
-                            if ( queries.length ) {
-                                handleQueried();
-
-                            } else {
-                                handleDone();
-                            }
-                        }
-                    }
-                }
-
-            // Do 4xx / 5xx
+            // Compile the effing template :-(
             } else {
-                
+                cache[ appRequest.params[ 0 ] ] = data;
+
+                compileTemplate( options, appRequest.params[ 0 ], data.json, data.html, function ( tpl ) {
+                    appResponse.status( 200 ).send( tpl )
+                });
             }
         });
     });
 
     http.Server( app ).listen( app.get( "port" ) );
 
-    console.log( "> squarespace-server running on port " + app.get( "port" ) );
+    functions.clog( "Running on port " + app.get( "port" ) );
 };
 
 module.exports = server;
