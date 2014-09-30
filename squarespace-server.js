@@ -2,6 +2,7 @@
  *
  * Squarespace node server.
  *
+ * @TODOS
  * @todo: squarespace:query
  * @todo: squarespace:block
  * @todo: squarespace:navigation
@@ -13,6 +14,10 @@
  * @todo: <script></script>
  * @todo: BadFormatters
  * @todo: BadPredicates
+ * @todo: SmartRoute2TemplateParser
+ *
+ * @PERFS
+ * format=json - skip the html request
  *
  * @BREAKS
  * work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
@@ -29,6 +34,7 @@ var express = require( "express" ),
     tunnel = require( "tunnel" ),
     fs = require( "fs" ),
     ncp = require( "ncp" ).ncp,
+    slug = require( "slug" ),
     jsonTemplate = require( "./lib/jsontemplate" ),
     matchRoute = require( "./lib/matchroute" ),
     functions = require( "./lib/functions" ),
@@ -41,6 +47,7 @@ var express = require( "express" ),
     rFooter = /footer/,
     rAttrs = /(\w+)=("[^<>"]*"|'[^<>']*'|\w+)/g,
     rScripts = /\<script\>(.*?)\<\/script\>/g,
+    rIco = /\.ico$/,
 
     rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
     rBlockTags = /^\{\@\|apply\s|\}$/g,
@@ -89,8 +96,6 @@ var express = require( "express" ),
     },
 
     server = {},
-
-    cache = {},
 
     scripts = [];
 
@@ -231,84 +236,6 @@ function recursiveBlockReplace( blockDir, template ) {
 }
 
 
-function requestJsonAndHtml( options, url, callback ) {
-    var urls = [url, url],
-        res = {};
-
-    function makeRequest() {
-        var qrs = {},
-            json = (urls.length === 2) ? true : false;
-
-        if ( options.password ) {
-            qrs.password = options.password;
-        }
-
-        if ( json ) {
-            qrs.format = "json";
-        }
-
-        request({
-            url: urls.pop(),
-            json: json,
-            headers: headers,
-            qs: qrs
-
-        }, function ( error, response, data ) {
-            if ( error ) {
-                functions.clog( error );
-                return;
-            }
-
-            if ( json ) {
-                res.json = data;
-
-            } else {
-                res.html = functions.squashHtml( data );
-            }
-
-            if ( urls.length ) {
-                makeRequest();
-
-            } else {
-                callback( res );
-            }
-        });
-    }
-
-    makeRequest();
-}
-
-
-function requestQuery( options, query, callback ) {
-    var data = functions.getAttrObj( query[ 1 ] ),
-        qrs = {
-            format: "json"
-        };
-
-    if ( options.password ) {
-        qrs.password = options.password;
-    }
-
-    if ( data.tag ) {
-        qrs.tag = data.tag;
-    }
-
-    if ( data.category ) {
-        qrs.category = data.category;
-    }
-
-    request({
-        url: ( options.siteurl + "/" + data.collection + "/" ),
-        json: true,
-        headers: headers,
-        qs: qrs
-
-    }, function ( error, response, body ) {
-        callback( query, data, body );
-    });
-}
-
-
 function injectNavigations( options, pageHtml, template ) {
     var blockDir = path.join( options.gitroot, "blocks" ),
         attrs,
@@ -317,7 +244,8 @@ function injectNavigations( options, pageHtml, template ) {
         open,
         close,
         regex,
-        matched;
+        matched,
+        match;
 
     // SQS Navigations
     matched = template.match( rSQSNavis );
@@ -329,8 +257,11 @@ function injectNavigations( options, pageHtml, template ) {
         open = filed.shift();
         close = filed.pop();
         regex = new RegExp( open + "(.*?)" + close );
+        match = pageHtml.match( regex );
 
-        template = template.replace( matched[ i ], pageHtml.match( regex )[ 0 ] );
+        if ( match ) {
+            template = template.replace( matched[ i ], match[ 0 ] );
+        }
     }
 
     return template;
@@ -355,14 +286,11 @@ function appendClickThroughUrls( options, template ) {
 }
 
 
-function compileTemplate( options, reqUri, pageJson, pageHtml, callback ) {
+function compileTemplate( options, reqUri, qrs, pageJson, pageHtml, callback ) {
     var queries = [],
         filepath = null,
         template = null,
-        matched = null,
-        qrs = {
-            format: "json"
-        };
+        matched = null;
 
     for ( var r in options.routes ) {
         matched = matchRoute.compare( r, reqUri );
@@ -432,7 +360,7 @@ function compileTemplate( options, reqUri, pageJson, pageHtml, callback ) {
                 }
 
                 if ( queries.length ) {
-                    requestQuery( options, queries.shift(), handleQueried );
+                    requestQuery( options, queries.shift(), qrs, handleQueried );
 
                 } else {
                     functions.clog( "Queries finished" );
@@ -449,6 +377,94 @@ function compileTemplate( options, reqUri, pageJson, pageHtml, callback ) {
             }
         }
     }
+}
+
+
+function requestHtml( options, url, qrs, callback ) {
+    request({
+        url: url,
+        headers: headers,
+        qs: qrs
+
+    }, function ( error, response, html ) {
+        if ( error ) {
+            functions.clog( error );
+            return;
+        }
+
+        callback( html );
+    });
+}
+
+function requestJson( options, url, qrs, callback ) {
+    var qs = {};
+        qs.format = "json";
+
+    for ( var i in qrs ) {
+        qs[ i ] = qrs[ i ];
+    }
+
+    request({
+        url: url,
+        json: true,
+        headers: headers,
+        qs: qs
+
+    }, function ( error, response, json ) {
+        if ( error ) {
+            functions.clog( error );
+            return;
+        }
+
+        callback( json );
+    });
+}
+
+
+function requestJsonAndHtml( options, url, qrs, callback ) {
+    var res = {};
+
+    requestJson( options, url, qrs, function ( json ) {
+        res.json = json;
+
+        requestHtml( options, url, qrs, function ( html ) {
+            res.html = html;
+
+            callback( res );
+        })
+    });
+}
+
+
+function requestQuery( options, query, qrs, callback ) {
+    var data = functions.getAttrObj( query[ 1 ] ),
+        url = ( options.siteurl + "/" + data.collection + "/" ),
+        qs = {};
+        qs.format = "json";
+
+    for ( var i in qrs ) {
+        qs[ i ] = qrs[ i ];
+    }
+
+    // Tag?
+    if ( data.tag ) {
+        qs.tag = data.tag;
+    }
+
+    // Category?
+    if ( data.category ) {
+        qs.category = data.category;
+    }
+
+    request({
+        url: url,
+        json: true,
+        headers: headers,
+        qs: qs
+
+    }, function ( error, response, json ) {
+        callback( query, data, json );
+    });
 }
 
 
@@ -484,7 +500,14 @@ server.init = function ( options ) {
 
         if ( !fs.existsSync( options.webroot ) ) {
             fs.mkdirSync( options.webroot );
-            fs.mkdirSync( path.join( options.webroot, ".cache" ) );
+        }
+    }
+
+    if ( !options.cacheroot ) {
+        options.cacheroot = path.join( options.webroot, ".cache" );
+
+        if ( !fs.existsSync( options.cacheroot ) ) {
+            fs.mkdirSync( options.cacheroot );
         }
     }
 
@@ -492,52 +515,100 @@ server.init = function ( options ) {
     app.use( express.static( options.webroot ) );
     app.set( "port", options.port );
     app.get( "*", function ( appRequest, appResponse ) {
-        var cached = cache[ appRequest.params[ 0 ] ],
-            qrs = {
-                format: "json"
-            };
+        var cacheHtml,
+            cacheJson,
+            reqSlug = slug( appRequest.params[ 0 ] ),
+            url = (options.siteurl + appRequest.params[ 0 ]),
+            qrs = {};
+
+        if ( rIco.test( appRequest.params[ 0 ] ) ) {
+            return;
+        }
 
         functions.clog( "GET - " + appRequest.params[ 0 ] );
 
-        // Preprocess templates here to capture local template edits
+        // Preprocess templates
+        // Execute on request for local changes
         preprocessTemplates( options );
 
-        // Password
+        // Homepage?
+        if ( reqSlug === "" ) {
+            reqSlug = "homepage";
+        }
+
+        cacheHtml = path.join( options.cacheroot, (reqSlug + ".html") );
+        cacheJson = path.join( options.cacheroot, (reqSlug + ".json") );
+
+        if ( fs.existsSync( cacheJson ) && fs.existsSync( cacheHtml ) ) {
+            cacheHtml = functions.readFile( path.join( options.cacheroot, (reqSlug + ".html") ) );
+            cacheJson = ("" + fs.readFileSync( path.join( options.cacheroot, (reqSlug + ".json") ) ));
+
+        } else {
+            cacheHtml = null;
+            cacheJson = null;
+        }
+
+        // JSON Cache?
+        if ( cacheJson ) {
+            cacheJson = JSON.parse( cacheJson );
+        }
+
+        // Password?
         if ( options.password ) {
             qrs.password = options.password;
         }
 
-        // Merge query
+        // Querystring?
         for ( i in appRequest.query ) {
             qrs[ i ] = appRequest.query[ i ];
         }
 
-        // Check the cache
-        if ( cached ) {
-            compileTemplate( options, appRequest.params[ 0 ], cached.json, cached.html, function ( tpl ) {
+        // Cache?
+        if ( cacheJson && cacheHtml && appRequest.query.format !== "json" ) {
+            functions.clog( "Loading request from cache" );
+
+            compileTemplate( options, appRequest.params[ 0 ], qrs, cacheJson, cacheHtml, function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
             });
-
-            functions.clog( "Loading request from cache" );
 
             return;
         }
 
-        // Get JSON and HMTL for the page requested, we need it :-(
-        requestJsonAndHtml( options, (options.siteurl + appRequest.params[ 0 ]), function ( data ) {
-            // Honor ?format=json, send response as json
-            if ( appRequest.query.format === "json" ) {
-                appResponse.status( 200 ).json( data.json );
+        // JSON?
+        if ( appRequest.query.format === "json" ) {
+            if ( cacheJson ) {
+                functions.clog( "Loading json from cache" );
 
-            // Compile the effing template :-(
+                appResponse.status( 200 ).json( cacheJson );
+
             } else {
-                cache[ appRequest.params[ 0 ] ] = data;
+                requestJson( options, url, qrs, function ( json ) {
+                    functions.writeFile(
+                        path.join( options.cacheroot, (reqSlug + ".json") ),
+                        JSON.stringify( json )
+                    );
 
-                compileTemplate( options, appRequest.params[ 0 ], data.json, data.html, function ( tpl ) {
-                    appResponse.status( 200 ).send( tpl )
+                    appResponse.status( 200 ).json( json );
                 });
             }
-        });
+
+        // Request page?
+        } else {
+            requestJsonAndHtml( options, url, qrs, function ( data ) {
+                functions.writeFile(
+                    path.join( options.cacheroot, (reqSlug + ".json") ),
+                    JSON.stringify( data.json )
+                );
+                functions.writeFile(
+                    path.join( options.cacheroot, (reqSlug + ".html") ),
+                    functions.squashHtml( data.html )
+                );
+
+                compileTemplate( options, appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
+                    appResponse.status( 200 ).send( tpl )
+                });
+            });
+        }
     });
 
     http.Server( app ).listen( app.get( "port" ) );
