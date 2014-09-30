@@ -9,6 +9,9 @@
  * @todo: squarespace.page-id
  * @todo: BadFormatters
  * @todo: BadPredicates
+ * @todo: 404 pages
+ * @todo: styles - less compile
+ * @todo: use collection.regionName for template matching
  *
  * @PERFS
  * ...
@@ -23,12 +26,10 @@ var express = require( "express" ),
     app = express(),
     path = require( "path" ),
     http = require( "http" ),
-    https = require( "https" ),
-    httpProxy = require( "http-proxy" ),
-    tunnel = require( "tunnel" ),
     fs = require( "fs" ),
     ncp = require( "ncp" ).ncp,
     slug = require( "slug" ),
+    less = require( "less" ),
     jsonTemplate = require( "./lib/jsontemplate" ),
     matchRoute = require( "./lib/matchroute" ),
     functions = require( "./lib/functions" ),
@@ -44,10 +45,12 @@ var express = require( "express" ),
     rIco = /\.ico$/,
     rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
     rBlockTags = /^\{\@\|apply\s|\}$/g,
+    rTplFiles = /\.item$|\.list$|\.region$/,
     rRegions = /\.region$/,
     rItemOrList = /\.item$|\.list$/,
     rItem = /\.item$/,
     rList = /\.list$/,
+    rLess = /\.less$/,
 
     // Squarespace content
     rSQSQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
@@ -77,6 +80,8 @@ var express = require( "express" ),
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36",
     },
 
+    directories = {},
+
     server = {},
 
     scripts = [];
@@ -87,7 +92,7 @@ function getToken() {
 }
 
 
-function recursiveBlockReplace( blockDir, template ) {
+function recursiveBlockReplace( template ) {
     var matched,
         block,
         filed;
@@ -95,7 +100,7 @@ function recursiveBlockReplace( blockDir, template ) {
     while ( matched = template.match( rBlockIncs ) ) {
         for ( i = 0, len = matched.length; i < len; i++ ) {
             block = matched[ i ].replace( rBlockTags, "" );
-            filed = functions.readFile( path.join( blockDir, block ) );
+            filed = functions.readFile( path.join( directories.blocks, block ) );
 
             template = template.replace( matched[ i ], filed );
         }
@@ -106,8 +111,7 @@ function recursiveBlockReplace( blockDir, template ) {
 
 
 function injectNavigations( options, pageHtml, template ) {
-    var blockDir = path.join( options.gitroot, "blocks" ),
-        attrs,
+    var attrs,
         block,
         filed,
         open,
@@ -122,7 +126,7 @@ function injectNavigations( options, pageHtml, template ) {
     for ( i = 0, len = matched.length; i < len; i++ ) {
         attrs = functions.getAttrObj( matched[ i ] );
         block = (attrs.template + ".block");
-        filed = ("" + fs.readFileSync( path.join( blockDir, block ) )).split( "\n" );
+        filed = ("" + fs.readFileSync( path.join( directories.blocks, block ) )).split( "\n" );
         open = filed.shift();
         close = filed.pop();
         regex = new RegExp( open + "(.*?)" + close );
@@ -155,7 +159,31 @@ function appendClickThroughUrls( options, template ) {
 }
 
 
-function getSmartTemplate( options, reqUri ) {
+function replaceSQSTags( template, pageJson ) {
+    //template = template.replace( SQS_HEADERS, "" );
+    template = template.replace( SQS_FOOTERS, "" );
+    template = template.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
+    template = template.replace( SQS_PAGE_CLASSES, "" );
+    template = template.replace( SQS_PAGE_ID, "" );
+    template = template.replace( SQS_POST_ENTRY, "" );
+
+    return template;
+}
+
+
+function getDirectoryTree( options ) {
+    return {
+        blocks: path.join( options.gitroot, "blocks" ),
+        collections: path.join( options.gitroot, "collections" ),
+        assets: path.join( options.gitroot, "assets" ),
+        pages: path.join( options.gitroot, "pages" ),
+        scripts: path.join( options.gitroot, "scripts" ),
+        styles: path.join( options.gitroot, "styles" ),
+    };
+}
+
+
+function getSmartTemplate( options, reqUri, pageJson ) {
     var template = null,
         uriSegs,
         regcheck,
@@ -171,7 +199,7 @@ function getSmartTemplate( options, reqUri ) {
     regcheck = new RegExp( ("^" + uriSegs[ 0 ]), "i" );
 
     for ( var i = tplFiles.length; i--; ) {
-        if ( !/\.item$|\.list$|\.region$/.test( tplFiles[ i ] ) ) {
+        if ( !rTplFiles.test( tplFiles[ i ] ) ) {
             continue;
         }
 
@@ -189,6 +217,10 @@ function getSmartTemplate( options, reqUri ) {
     }
 
     if ( !template ) {
+        template = (pageJson.collection.regionName + ".region");
+    }
+
+    if ( !template ) {
         functions.clog( "Template not matched - " + template );
 
     } else {
@@ -201,15 +233,10 @@ function getSmartTemplate( options, reqUri ) {
 
 function preprocessTemplates( options ) {
     var templateConf = JSON.parse( functions.readFile( path.join( options.gitroot, "template.conf" ) ) ),
-        blockDir = path.join( options.gitroot, "blocks" ),
-        collectionDir = path.join( options.gitroot, "collections" ),
-        assetDir = path.join( options.gitroot, "assets" ),
-        pageDir = path.join( options.gitroot, "pages" ),
-        scriptDir = path.join( options.gitroot, "scripts" ),
-        styleDir = path.join( options.gitroot, "styles" ),
-        collections = fs.readdirSync( collectionDir ),
+        collections = fs.readdirSync( directories.collections ),
         allFiles = fs.readdirSync( options.gitroot ),
         tplFiles = fs.readdirSync( options.webroot ),
+        reset = path.join( directories.styles, "reset.css" ),
         regions = [],
         header,
         footer,
@@ -219,12 +246,10 @@ function preprocessTemplates( options ) {
         filed,
         block,
         attrs,
-
         cont,
         file,
         link,
         files,
-
         len,
         i,
         j;
@@ -243,7 +268,7 @@ function preprocessTemplates( options ) {
     for ( i = collections.length; i--; ) {
         if ( rItemOrList.test( collections[ i ] ) ) {
             cont = "";
-            file = path.join( collectionDir, collections[ i ] );
+            file = path.join( directories.collections, collections[ i ] );
             link = path.join( options.webroot, collections[ i ] );
             files = [header, file, footer];
 
@@ -269,7 +294,7 @@ function preprocessTemplates( options ) {
     }
 
     for ( i = tplFiles.length; i--; ) {
-        if ( !/\.item$|\.list$|\.region$/.test( tplFiles[ i ] ) ) {
+        if ( !rTplFiles.test( tplFiles[ i ] ) ) {
             continue;
         }
 
@@ -280,60 +305,86 @@ function preprocessTemplates( options ) {
         template = functions.readFile( filepath );
 
         // SQS Blocks
-        template = recursiveBlockReplace( blockDir, template );
+        template = recursiveBlockReplace( template );
 
         // Plain Scripts, will be added back after all parsing
         matched = template.match( rScripts );
 
-        for ( j = 0, len = matched.length; j < len; j++ ) {
-            token = getToken();
-            scripts.push({
-                token: token,
-                script: matched[ j ]
-            });
+        if ( matched ) {
+            for ( j = 0, len = matched.length; j < len; j++ ) {
+                token = getToken();
+                scripts.push({
+                    token: token,
+                    script: matched[ j ]
+                });
 
-            template = template.replace( matched[ j ], token );
+                template = template.replace( matched[ j ], token );
+            }
         }
 
         // SQS Scripts
         matched = template.match( rSQSScripts );
 
-        for ( j = 0, len = matched.length; j < len; j++ ) {
-            attrs = functions.getAttrObj( matched[ j ] );
-            block = ( "/scripts/" + attrs.src );
-            filed = '<script src="' + block + '"></script>';
+        if ( matched ) {
+            for ( j = 0, len = matched.length; j < len; j++ ) {
+                attrs = functions.getAttrObj( matched[ j ] );
+                block = ( "/scripts/" + attrs.src );
+                filed = '<script src="' + block + '"></script>';
 
-            template = template.replace( matched[ j ], filed );
+                template = template.replace( matched[ j ], filed );
+            }
         }
 
-        // Squarespace Tags
-        template = template.replace( SQS_HEADERS, "" );
-        template = template.replace( SQS_FOOTERS, "" );
-        template = template.replace( SQS_MAIN_CONTENT, "" );
-        template = template.replace( SQS_PAGE_CLASSES, "" );
-        template = template.replace( SQS_PAGE_ID, "" );
-        template = template.replace( SQS_POST_ENTRY, "" );
+        // Stylesheets
+        filed = "";
+
+        if ( fs.existsSync( reset ) ) {
+            filed += functions.readFile( reset );
+        }
+
+        for ( var j = 0, len = templateConf.stylesheets.length; j < len; j++ ) {
+            file = "" + fs.readFileSync( path.join( directories.styles, templateConf.stylesheets[ j ] ) );
+
+            if ( rLess.test( templateConf.stylesheets[ j ] ) ) {
+                less.render( file, function ( e, css ) {
+                    filed += css;
+                });
+
+            } else {
+                filed += file;
+            }
+        }
+
+        template = template.replace( SQS_HEADERS, '<link href="/styles/styles.css" rel="stylesheet" />' );
+
+        functions.writeFile( path.join( options.styleroot, "styles.css" ), filed );
 
         functions.writeFile( filepath, template );
     }
 
     // Copy assets + scripts to .server
-    ncp( assetDir, path.join( options.webroot, "assets" ) );
-    ncp( scriptDir, path.join( options.webroot, "scripts" ) );
+    ncp( directories.assets, path.join( options.webroot, "assets" ) );
+    ncp( directories.scripts, path.join( options.webroot, "scripts" ) );
 }
 
 
-function compileTemplate( options, qrs, pageJson, pageHtml, callback ) {
+function compileTemplate( options, reqUri, qrs, pageJson, pageHtml, callback ) {
     var queries = [],
         filepath = null,
         template = null,
         matched = null;
 
-    // File Path
+    // Template?
+    options.template = getSmartTemplate( options, reqUri, pageJson );
+
+    // Filepath?
     filepath = path.join( options.webroot, options.template );
 
-    // Template
+    // Html?
     template = functions.readFile( filepath );
+
+    // SQS Tags
+    template = replaceSQSTags( template, pageJson );
 
     // Queries
     // 0 => Full
@@ -556,6 +607,14 @@ server.init = function ( options ) {
         }
     }
 
+    if ( !options.styleroot ) {
+        options.styleroot = path.join( options.webroot, "styles" );
+
+        if ( !fs.existsSync( options.styleroot ) ) {
+            fs.mkdirSync( options.styleroot );
+        }
+    }
+
     // Bind Express routing
     app.use( express.static( options.webroot ) );
     app.set( "port", options.port );
@@ -572,8 +631,8 @@ server.init = function ( options ) {
 
         functions.clog( "GET - " + appRequest.params[ 0 ] );
 
-        // Template?
-        options.template = getSmartTemplate( options, appRequest.params[ 0 ] );
+        // Directories?
+        directories = getDirectoryTree( options );
 
         // Preprocess templates
         // Execute on request for local changes
@@ -617,7 +676,7 @@ server.init = function ( options ) {
         if ( cacheJson && cacheHtml && appRequest.query.format !== "json" ) {
             functions.clog( "Loading request from cache" );
 
-            compileTemplate( options, qrs, cacheJson, cacheHtml, function ( tpl ) {
+            compileTemplate( options, appRequest.params[ 0 ], qrs, cacheJson, cacheHtml, function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
             });
 
@@ -645,7 +704,7 @@ server.init = function ( options ) {
                 functions.writeJson( path.join( options.cacheroot, (reqSlug + ".json") ), data.json );
                 functions.writeFile( path.join( options.cacheroot, (reqSlug + ".html") ), functions.squashHtml( data.html ) );
 
-                compileTemplate( options, qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
+                compileTemplate( options, appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
                     appResponse.status( 200 ).send( tpl )
                 });
             });

@@ -37,8 +37,7 @@
         "express": "~4.9",
         "ncp": "~0.6",
         "slug": "~0.7",
-        "http-proxy": "~1.4",
-        "tunnel": "0.0.3"
+        "less": "~1.7"
     },
     "keywords": [
         "squarespace",
