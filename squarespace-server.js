@@ -14,6 +14,10 @@
  * @todo: BadFormatters
  * @todo: BadPredicates
  *
+ * @BREAKS
+ * work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
+ * post-item.block - {.if categories}{.repeated section categories}{@}{.alternates with}{.end}{.end}
+ *
  */
 var express = require( "express" ),
     request = require( "request" ),
@@ -48,6 +52,7 @@ var express = require( "express" ),
     rSQSNavis = /\<squarespace:navigation(.*?)\/\>/g,
     rSQSBlockFields = /\<squarespace:block(.*?)\/\>/g,
     rSQSScripts = /\<squarespace:script(.*?)\/\>/g,
+    rSQSClickThroughUrl = /\/s\/(.*?)\.\w+.*?/g,
 
     // collectionId=hash
     API_COLLECTION = "api/commondata/GetCollection",
@@ -165,14 +170,7 @@ function preprocessTemplates( options ) {
         template = functions.readFile( filepath );
 
         // SQS Blocks
-        matched = template.match( rBlockIncs );
-
-        for ( i = 0, len = matched.length; i < len; i++ ) {
-            block = matched[ i ].replace( rBlockTags, "" );
-            filed = functions.readFile( path.join( blockDir, block ) );
-
-            template = template.replace( matched[ i ], filed );
-        }
+        template = recursiveBlockReplace( blockDir, template );
 
         // Plain Scripts, will be added back after all parsing
         matched = template.match( rScripts );
@@ -215,6 +213,24 @@ function preprocessTemplates( options ) {
 }
 
 
+function recursiveBlockReplace( blockDir, template ) {
+    var matched,
+        block,
+        filed;
+
+    while ( matched = template.match( rBlockIncs ) ) {
+        for ( i = 0, len = matched.length; i < len; i++ ) {
+            block = matched[ i ].replace( rBlockTags, "" );
+            filed = functions.readFile( path.join( blockDir, block ) );
+
+            template = template.replace( matched[ i ], filed );
+        }
+    }
+
+    return template;
+}
+
+
 function requestJsonAndHtml( options, url, callback ) {
     var urls = [url, url],
         res = {};
@@ -247,7 +263,7 @@ function requestJsonAndHtml( options, url, callback ) {
                 res.json = data;
 
             } else {
-                res.html = data;
+                res.html = functions.squashHtml( data );
             }
 
             if ( urls.length ) {
@@ -293,6 +309,52 @@ function requestQuery( options, query, callback ) {
 }
 
 
+function injectNavigations( options, pageHtml, template ) {
+    var blockDir = path.join( options.gitroot, "blocks" ),
+        attrs,
+        block,
+        filed,
+        open,
+        close,
+        regex,
+        matched;
+
+    // SQS Navigations
+    matched = template.match( rSQSNavis );
+
+    for ( i = 0, len = matched.length; i < len; i++ ) {
+        attrs = functions.getAttrObj( matched[ i ] );
+        block = (attrs.template + ".block");
+        filed = ("" + fs.readFileSync( path.join( blockDir, block ) )).split( "\n" );
+        open = filed.shift();
+        close = filed.pop();
+        regex = new RegExp( open + "(.*?)" + close );
+
+        template = template.replace( matched[ i ], pageHtml.match( regex )[ 0 ] );
+    }
+
+    return template;
+}
+
+
+function appendClickThroughUrls( options, template ) {
+    var matched = template.match( rSQSClickThroughUrl ),
+        fullUrl;
+
+    if ( !matched ) {
+        return template;
+    }
+
+    for ( i = 0, len = matched.length; i < len; i++ ) {
+        fullUrl = (options.siteurl + matched[ i ]);
+
+        template = template.replace( matched[ i ], fullUrl );
+    }
+
+    return template;
+}
+
+
 function compileTemplate( options, reqUri, pageJson, pageHtml, callback ) {
     var queries = [],
         filepath = null,
@@ -326,6 +388,12 @@ function compileTemplate( options, reqUri, pageJson, pageHtml, callback ) {
             }
 
             function handleDone() {
+                // Render Navigations from pageHtml
+                template = injectNavigations( options, pageHtml, template );
+
+                // Render full clickThroughUrl's
+                template = appendClickThroughUrls( options, template );
+
                 // Render w/jsontemplate
                 template = jsonTemplate.Template( template, jsontOptions );
                 template = template.expand( pageJson );
@@ -416,6 +484,7 @@ server.init = function ( options ) {
 
         if ( !fs.existsSync( options.webroot ) ) {
             fs.mkdirSync( options.webroot );
+            fs.mkdirSync( path.join( options.webroot, ".cache" ) );
         }
     }
 
