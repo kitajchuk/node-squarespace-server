@@ -37,7 +37,8 @@
         "express": "~4.9",
         "ncp": "~0.6",
         "slug": "~0.7",
-        "less": "~1.7"
+        "less": "~1.7",
+        "underscore": "~1.7"
     },
     "keywords": [
         "squarespace",
