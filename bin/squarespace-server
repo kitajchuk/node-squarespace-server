@@ -5,7 +5,7 @@ var fs = require( "fs" ),
     args = [].slice.call( process.argv, 2 ),
     path = require( "path" ),
     server = require( "../squarespace-server" ),
-    config = path.join( cwd, "server.conf" );
+    config = path.join( cwd, "template.conf" );
     config = ("" + fs.readFileSync( config ));
     config = JSON.parse( config );
 

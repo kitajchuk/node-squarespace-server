@@ -5,7 +5,7 @@ squarespace-server
 
 
 ## Installation
-Be wary, this is absolutely in development and is NOT finished. But, if you're interested, carry on with caution. This is not yet published to [npm](http://npmjs.org), so your setup is as follows:
+This is NOT finished. But, if you're interested, carry on. This is not yet published to [npm](http://npmjs.org), so your setup is as follows:
 
 ```shell
 git clone git@github.com:kitajchuk/squarespace-server.git
@@ -18,10 +18,10 @@ npm install -g .
 
 
 ## Usage
-Navigate to your [Squarespace](http://squarespace.com) developer template and create a `server.conf` file like this:
+Navigate to your [Squarespace](http://squarespace.com) developer template and add to your `template.conf` file:
 
 ```json
-{
+"server": {
     "siteurl": "https://yourite.squarespace.com",
     "password": "sitewide password here if applicable"
 }
@@ -38,8 +38,6 @@ This runs the [express](http://expressjs.com) server on port `5050` for `localho
 
 
 ## Notes
-Obviously this is still in development. There are a lot of things to consider with its usage. First and foremost, even if it is done someday, it runs as a logged out ALWAYS environment. You're seeing the site as a user or customer would see it AND you're missing certain content. Anyway, it is a pret project. But I am surprised at how far it has come along in a short amount of time.
-
-Cheers,
+The primary purpose of this is to speed up aspects of development locally before you need to push to your Squarespace site. I think we can all agree that having to execute a `git push` to test your code is not practical. So, enjoy.
 
 -BK

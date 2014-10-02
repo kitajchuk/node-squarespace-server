@@ -3,22 +3,17 @@
  * Squarespace node server.
  *
  * @TODOS
- * @todo: squarespace:block-field
- * @todo: squarespace.main-content
- * @todo: squarespace.page-classes
- * @todo: squarespace.page-id
- * @todo: BadFormatters
- * @todo: BadPredicates
- * @todo: 404 pages
- * @todo: sqs server scripts
- * @todo: merge server config into template.conf
+ * - squarespace:block-field
+ * - squarespace.page-classes
+ * - squarespace.page-id
+ * - JSON Template Scope Creep
+ * - 404 Requests
+ * - YUI Implementation
+ * - Parse ImageLoader from html
  *
- * @PERFS
- * ...
- *
- * @BREAKS
- * work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
- * post-item.block - {.if categories}{.repeated section categories}{@}{.alternates with}{.end}{.end}
+ * @JSONT Errors
+ * - work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
+ * - post-item.block - {.if categories}{.repeated section categories}{@}{.alternates with}{.end}{.end}
  *
  */
 var _ = require( "underscore" ),
@@ -30,9 +25,11 @@ var _ = require( "underscore" ),
     ncp = require( "ncp" ).ncp,
     slug = require( "slug" ),
     less = require( "less" ),
+    uglifycss = require( "uglifycss" ),
     jsonTemplate = require( "./lib/jsontemplate" ),
     functions = require( "./lib/functions" ),
 
+    rProtocol = /^https:|^http:/g,
     rQuote = /\'|\"/g,
     rSlash = /^\/|\/$/g,
     rSpaces = /^\s+|\s+$/,
@@ -57,6 +54,10 @@ var _ = require( "underscore" ),
     rSQSBlockFields = /\<squarespace:block-field(.*?)\/\>/g,
     rSQSScripts = /\<squarespace:script(.*?)\/\>/g,
     rSQSClickThroughUrl = /\/s\/(.*?)\.\w+.*?/g,
+    rSQSFootersFull = /\<script type="text\/javascript" data-sqs-type="imageloader"\>(.*)\<\/script\>/,
+    rSQSHeadersFull = null,
+    rSiteCssReplace = /\<link rel="stylesheet" type="text\/css" href="(.*?)site\.css\?(.*?)\>/g,
+    rHref = /href="(.*?)"/,
 
     SQS_HEADERS = "{squarespace-headers}",
     SQS_FOOTERS = "{squarespace-footers}",
@@ -75,14 +76,8 @@ var _ = require( "underscore" ),
         undefined_str: undefined_str
     },
 
-    sqsHeaders = [
-        '<link href="/styles/styles.css" rel="stylesheet" />',
-        '<script src="http://static.squarespace.com/universal/scripts-compressed/common.js"></script>',
-        '<script src="http://static.squarespace.com/universal/scripts-compressed/commerce.js"></script>'
-    ],
-    sqsFooters = [
-        '<script src="/sqs/imageloader.js"></script>'
-    ],
+    sqsHeaders = [],
+    sqsFooters = [],
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36",
@@ -91,18 +86,18 @@ var _ = require( "underscore" ),
     // Squarespace uses /homepage
     homepage = "homepage",
 
-    server = {},
     directories = {},
 
-    options = {
-        port: 5050,
-        gitroot: process.cwd(),
-    },
+    config = null,
 
     scripts = [],
 
+    siteCss = null,
+
     header = null,
     footer = null,
+
+    templates = {},
 
     app = express();
 
@@ -202,7 +197,7 @@ function requestJsonAndHtml( url, qrs, callback ) {
  */
 function requestQuery( query, qrs, callback ) {
     var data = functions.getAttrObj( query[ 1 ] ),
-        url = ( options.siteurl + "/" + data.collection + "/" ),
+        url = ( config.server.siteurl + "/" + data.collection + "/" ),
         slg = ("query-" + data.collection),
         qs = {};
         qs.format = "json";
@@ -223,7 +218,7 @@ function requestQuery( query, qrs, callback ) {
         slg += "-" + data.category;
     }
 
-    slg = path.join( options.cacheroot, (slg + ".json") );
+    slg = path.join( config.server.cacheroot, (slg + ".json") );
 
     // Cached?
     if ( fs.existsSync( slg ) ) {
@@ -249,58 +244,30 @@ function requestQuery( query, qrs, callback ) {
 
 /**
  *
- * options = {
+ * config.server = {
  *      siteurl,
- *      gitroot,
  *      webroot,
  *      cacheroot,
- *      styleroot
- *      port
+ *      port,
+ *      password
  * };
  *
- * @method setOptions
- * @param {object} config The server.conf json
- * @returns {string}
+ * @method setServerConfig
  * @private
  *
  */
-function setOptions( config ) {
-    // @global - options
-    options.siteurl = config.siteurl.replace( rSlash, "" );
+function setServerConfig() {
+    // @global - config
+    config.server.siteurl = config.server.siteurl.replace( rSlash, "" );
+    config.server.port = 5050;
+    config.server.webroot = process.cwd();
+    config.server.protocol = config.server.siteurl.match( rProtocol )[ 0 ];
 
-    if ( config.password ) {
-        options.password = config.password;
-    }
+    if ( !config.server.cacheroot ) {
+        config.server.cacheroot = path.join( config.server.webroot, ".sqs-cache" );
 
-    if ( !config.webroot ) {
-        options.webroot = path.join( options.gitroot, ".server" );
-
-        if ( !fs.existsSync( options.webroot ) ) {
-            fs.mkdirSync( options.webroot );
-        }
-    }
-
-    if ( !config.cacheroot ) {
-        options.cacheroot = path.join( options.webroot, ".cache" );
-
-        if ( !fs.existsSync( options.cacheroot ) ) {
-            fs.mkdirSync( options.cacheroot );
-        }
-    }
-
-    if ( !config.styleroot ) {
-        options.styleroot = path.join( options.webroot, "styles" );
-
-        if ( !fs.existsSync( options.styleroot ) ) {
-            fs.mkdirSync( options.styleroot );
-        }
-    }
-
-    if ( !config.sqsroot ) {
-        options.sqsroot = path.join( options.webroot, "sqs" );
-
-        if ( !fs.existsSync( options.sqsroot ) ) {
-            fs.mkdirSync( options.sqsroot );
+        if ( !fs.existsSync( config.server.cacheroot ) ) {
+            fs.mkdirSync( config.server.cacheroot );
         }
     }
 }
@@ -316,34 +283,13 @@ function setOptions( config ) {
 function setDirectories() {
     // @global - directories
     directories = {
-        blocks: path.join( options.gitroot, "blocks" ),
-        collections: path.join( options.gitroot, "collections" ),
-        assets: path.join( options.gitroot, "assets" ),
-        pages: path.join( options.gitroot, "pages" ),
-        scripts: path.join( options.gitroot, "scripts" ),
-        styles: path.join( options.gitroot, "styles" )
+        blocks: path.join( config.server.webroot, "blocks" ),
+        collections: path.join( config.server.webroot, "collections" ),
+        assets: path.join( config.server.webroot, "assets" ),
+        pages: path.join( config.server.webroot, "pages" ),
+        scripts: path.join( config.server.webroot, "scripts" ),
+        styles: path.join( config.server.webroot, "styles" )
     };
-
-    // @global - server
-    server = {
-        assets: path.join( options.webroot, "assets" ),
-        scripts: path.join( options.webroot, "scripts" ),
-        styles: path.join( options.webroot, "styles" ),
-        sqs: path.join( options.webroot, "sqs" )
-    };
-}
-
-
-/**
- *
- * @method copyDirectoriesToServer
- * @private
- *
- */
-function copyDirectoriesToServer() {
-    ncp( directories.assets, server.assets );
-    ncp( directories.scripts, server.scripts );
-    ncp( path.join( __dirname, "sqs" ), server.sqs );
 }
 
 
@@ -361,20 +307,35 @@ function getToken() {
 
 /**
  *
+ * @method setSQSHeadersFooters
+ * @param {function} callback Handle composition done
+ * @private
+ *
+ */
+function setSQSHeadersFooters( callback ) {
+    sqsHeaders = [];
+    sqsFooters = [];
+
+    return callback;
+}
+
+
+/**
+ *
  * @method setHeaderFooter
  * @param {function} callback Handle composition done
  * @private
  *
  */
 function setHeaderFooter( callback ) {
-    var files = fs.readdirSync( options.gitroot );
+    var files = fs.readdirSync( config.server.webroot );
 
     for ( i = files.length; i--; ) {
         if ( rRegions.test( files[ i ] ) && rHeader.test( files[ i ] ) ) {
-            header = path.join( options.gitroot, files[ i ] );
+            header = path.join( config.server.webroot, files[ i ] );
 
         } else if ( rRegions.test( files[ i ] ) && rFooter.test( files[ i ] ) ) {
-            footer = path.join( options.gitroot, files[ i ] );
+            footer = path.join( config.server.webroot, files[ i ] );
         }
     }
 
@@ -393,21 +354,19 @@ function compileCollections( callback ) {
     var collections = fs.readdirSync( directories.collections ),
         content = null,
         file = null,
-        link = null,
         files = null;
 
     for ( var i = collections.length; i--; ) {
         if ( rItemOrList.test( collections[ i ] ) ) {
             content = "";
             file = path.join( directories.collections, collections[ i ] );
-            link = path.join( options.webroot, collections[ i ] );
             files = [header, file, footer];
 
             for ( var j = 0, len = files.length; j < len; j++ ) {
                 content += functions.readFile( files[ j ] );
             }
 
-            functions.writeFile( link, content );
+            templates[ collections[ i ] ] = content;
         }
     }
 
@@ -423,21 +382,20 @@ function compileCollections( callback ) {
  *
  */
 function compileRegions( callback ) {
-    var templateConf = JSON.parse( functions.readFile( path.join( options.gitroot, "template.conf" ) ) ),
-        files = null,
+    var files = null,
         file = null,
         link = null;
 
-    for ( var i in templateConf.layouts ) {
-        files = templateConf.layouts[ i ].regions;
+    for ( var i in config.layouts ) {
+        files = config.layouts[ i ].regions;
         file = "";
-        link = path.join( options.webroot, (templateConf.layouts[ i ].name.toLowerCase() + ".region") );
+        link = (config.layouts[ i ].name.toLowerCase() + ".region");
 
         for ( j = 0, len = files.length; j < len; j++ ) {
-            file += functions.readFile( path.join( options.gitroot, (files[ j ] + ".region") ) );
+            file += functions.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) );
         }
 
-        functions.writeFile( link, file );
+        templates[ link ] = file;
     }
 
     return callback;
@@ -452,32 +410,23 @@ function compileRegions( callback ) {
  *
  */
 function replaceBlocks( callback ) {
-    var files = fs.readdirSync( options.webroot ),
-        filepath,
-        fileguts,
-        matched,
+    var matched,
         block,
         filed;
 
-    for ( var i = files.length; i--; ) {
-        if ( !rTplFiles.test( files[ i ] ) ) {
+    for ( var i in templates ) {
+        if ( !rTplFiles.test( i ) ) {
             continue;
         }
 
-        filepath = path.join( options.webroot, files[ i ] );
-
-        fileguts = functions.readFile( filepath );
-
-        while ( matched = fileguts.match( rBlockIncs ) ) {
+        while ( matched = templates[ i ].match( rBlockIncs ) ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
                 block = matched[ j ].replace( rBlockTags, "" );
                 filed = functions.readFile( path.join( directories.blocks, block ) );
 
-                fileguts = fileguts.replace( matched[ j ], filed );
+                templates[ i ] = templates[ i ].replace( matched[ j ], filed );
             }
         }
-
-        functions.writeFile( filepath, fileguts );
     }
 
     return callback;
@@ -492,22 +441,15 @@ function replaceBlocks( callback ) {
  *
  */
 function replaceScripts( callback ) {
-    var files = fs.readdirSync( options.webroot ),
-        filepath,
-        fileguts,
-        matched,
+    var matched,
         token;
 
-    for ( var i = files.length; i--; ) {
-        if ( !rTplFiles.test( files[ i ] ) ) {
+    for ( var i in templates ) {
+        if ( !rTplFiles.test( i ) ) {
             continue;
         }
 
-        filepath = path.join( options.webroot, files[ i ] );
-
-        fileguts = functions.readFile( filepath );
-
-        matched = fileguts.match( rScripts );
+        matched = templates[ i ].match( rScripts );
 
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
@@ -517,11 +459,9 @@ function replaceScripts( callback ) {
                     script: matched[ j ]
                 });
 
-                fileguts = fileguts.replace( matched[ j ], token );
+                templates[ i ] = templates[ i ].replace( matched[ j ], token );
             }
         }
-
-        functions.writeFile( filepath, fileguts );
     }
 
     return callback;
@@ -536,24 +476,17 @@ function replaceScripts( callback ) {
  *
  */
 function replaceSQSScripts( callback ) {
-    var files = fs.readdirSync( options.webroot ),
-        filepath,
-        fileguts,
-        matched,
+    var matched,
         attrs,
         block,
         filed;
 
-    for ( var i = files.length; i--; ) {
-        if ( !rTplFiles.test( files[ i ] ) ) {
+    for ( var i in templates ) {
+        if ( !rTplFiles.test( i ) ) {
             continue;
         }
 
-        filepath = path.join( options.webroot, files[ i ] );
-
-        fileguts = functions.readFile( filepath );
-
-        matched = fileguts.match( rSQSScripts );
+        matched = templates[ i ].match( rSQSScripts );
 
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
@@ -561,11 +494,9 @@ function replaceSQSScripts( callback ) {
                 block = ( "/scripts/" + attrs.src );
                 filed = '<script src="' + block + '"></script>';
 
-                fileguts = fileguts.replace( matched[ j ], filed );
+                templates[ i ] = templates[ i ].replace( matched[ j ], filed );
             }
         }
-
-        functions.writeFile( filepath, fileguts );
     }
 
     return callback;
@@ -580,22 +511,18 @@ function replaceSQSScripts( callback ) {
  *
  */
 function compileStylesheets( callback ) {
-    var templateConf = JSON.parse( functions.readFile( path.join( options.gitroot, "template.conf" ) ) ),
-        files = fs.readdirSync( options.webroot ),
-        reset = path.join( directories.styles, "reset.css" ),
+    var reset = path.join( directories.styles, "reset.css" ),
         styles = "",
-        file,
-        filepath,
-        fileguts;
+        file;
 
     if ( fs.existsSync( reset ) ) {
         styles += functions.readFile( reset );
     }
 
-    for ( var i = 0, len = templateConf.stylesheets.length; i < len; i++ ) {
-        file = "" + fs.readFileSync( path.join( directories.styles, templateConf.stylesheets[ i ] ) );
+    for ( var i = 0, len = config.stylesheets.length; i < len; i++ ) {
+        file = "" + fs.readFileSync( path.join( directories.styles, config.stylesheets[ i ] ) );
 
-        if ( rLess.test( templateConf.stylesheets[ i ] ) ) {
+        if ( rLess.test( config.stylesheets[ i ] ) ) {
             less.render( file, function ( e, css ) {
                 styles += css;
             });
@@ -605,19 +532,7 @@ function compileStylesheets( callback ) {
         }
     }
 
-    functions.writeFile( path.join( options.styleroot, "styles.css" ), styles );
-
-    for ( var j = files.length; j--; ) {
-        if ( !rTplFiles.test( files[ j ] ) ) {
-            continue;
-        }
-
-        filepath = path.join( options.webroot, files[ j ] );
-
-        fileguts = functions.readFile( filepath );
-
-        functions.writeFile( filepath, fileguts );
-    }
+    siteCss = uglifycss.processString( styles );
 
     return callback;
 }
@@ -634,8 +549,7 @@ function compileStylesheets( callback ) {
 function getTemplate( reqUri, pageJson ) {
     var template = null,
         uriSegs = null,
-        regcheck = null,
-        tplFiles = fs.readdirSync( options.webroot );
+        regcheck = null;
 
     if ( reqUri === "/" ) {
         uriSegs = [homepage];
@@ -646,31 +560,31 @@ function getTemplate( reqUri, pageJson ) {
 
     regcheck = new RegExp( ("^" + uriSegs[ 0 ] + ".*?\\."), "i" );
 
-    for ( var i = tplFiles.length; i--; ) {
-        if ( !rTplFiles.test( tplFiles[ i ] ) ) {
+    for ( var tpl in templates ) {
+        if ( !rTplFiles.test( tpl ) ) {
             continue;
         }
 
         // 0 => Multiple URIs some/fresh/page
         // 1 => Regular Expression tests out
         // 2 => Filename tests out as a .item file
-        if ( uriSegs.length > 1 && regcheck.test( tplFiles[ i ] ) && rItem.test( tplFiles[ i ] ) ) {
-            template = tplFiles[ i ];
+        if ( uriSegs.length > 1 && regcheck.test( tpl ) && rItem.test( tpl ) ) {
+            template = tpl;
             break;
         }
 
         // 0 => A Single URI page
         // 1 => Regular Expression tests out
         // 2 => Filename tests out as a .list file
-        if ( uriSegs.length === 1 && regcheck.test( tplFiles[ i ] ) && rList.test( tplFiles[ i ] ) ) {
-            template = tplFiles[ i ];
+        if ( uriSegs.length === 1 && regcheck.test( tpl ) && rList.test( tpl ) ) {
+            template = tpl;
             break;
         }
 
         // 1 => Regular Expression tests out
         // 2 => Filename tests out as a .region file
-        if ( regcheck.test( tplFiles[ i ] ) && rRegions.test( tplFiles[ i ] ) ) {
-            template = tplFiles[ i ];
+        if ( regcheck.test( tpl ) && rRegions.test( tpl ) ) {
+            template = tpl;
             break;
         }
     }
@@ -702,8 +616,6 @@ function getTemplate( reqUri, pageJson ) {
  *
  */
 function replaceSQSTags( rendered, pageJson ) {
-    //rendered = rendered.replace( SQS_HEADERS, "" );
-    //rendered = rendered.replace( SQS_FOOTERS, "" );
     rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
     rendered = rendered.replace( SQS_PAGE_CLASSES, "" );
     rendered = rendered.replace( SQS_PAGE_ID, "" );
@@ -769,13 +681,67 @@ function replaceClickThroughUrls( rendered ) {
 
     if ( matched ) {
         for ( i = 0, len = matched.length; i < len; i++ ) {
-            fullUrl = (options.siteurl + matched[ i ]);
+            fullUrl = (config.server.siteurl + matched[ i ]);
 
             rendered = rendered.replace( matched[ i ], fullUrl );
         }
     }
 
     return rendered;
+}
+
+
+/**
+ *
+ * @method setHeaderFooterTokens
+ * @param {object} pageJson JSON data for page
+ * @param {string} pageHtml HTML for page
+ * @returns {string}
+ * @private
+ *
+ */
+function setHeaderFooterTokens( pageJson, pageHtml ) {
+    var tokenTypekit = getToken(),
+        tokenHeadersFull = getToken(),
+        tokenFootersFull = getToken(),
+        sHeadersFull = pageHtml.match( rSQSHeadersFull ),
+        sFootersFull = pageHtml.match( rSQSFootersFull ),
+        siteStyleTag = null,
+        sSiteCssMatch;
+
+    // Typekit?
+    if ( pageJson.website.typekitId ) {
+        sqsHeaders.push( '<script src="//use.typekit.com/' + pageJson.website.typekitId + '.js"></script>' );
+        sqsHeaders.push( tokenTypekit );
+
+        scripts.push({
+            token: tokenTypekit,
+            script: '<script>try{Typekit.load();}catch(e){}</script>'
+        });
+    }
+
+    // Footers?
+    if ( sFootersFull ) {
+        sqsFooters.push( tokenFootersFull );
+        scripts.push({
+            token: tokenFootersFull,
+            script: sFootersFull[ 0 ]
+        });
+    }
+
+    // Headers?
+    if ( sHeadersFull ) {
+        sHeadersFull = sHeadersFull[ 0 ];
+        //sSiteCssMatch = sHeadersFull[ 0 ].match( rSiteCssReplace );
+        siteStyleTag = '<!-- ' + config.name + ' Local Styles --><style type="text/css">' + siteCss + '</style>';
+        //sHeadersFull = sHeadersFull[ 0 ].replace( sSiteCssMatch[ sSiteCssMatch.length - 1 ], "<!-- Site.css Removed -->" );
+        sHeadersFull += siteStyleTag;
+        sqsHeaders.push( tokenHeadersFull );
+        scripts.push({
+            token: tokenHeadersFull,
+            script: sHeadersFull
+        });
+    }
 }
 
 
@@ -792,7 +758,6 @@ function replaceClickThroughUrls( rendered ) {
  */
 function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
     var queries = [],
-        filepath = null,
         template = null,
         rendered = null,
         matched = null;
@@ -800,11 +765,8 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
     // Template?
     template = getTemplate( reqUri, pageJson );
 
-    // Filepath?
-    filepath = path.join( options.webroot, template );
-
     // Html?
-    rendered = functions.readFile( filepath );
+    rendered = templates[ template ];
 
     // SQS Tags?
     rendered = replaceSQSTags( rendered, pageJson );
@@ -821,34 +783,8 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
     }
 
     function handleDone() {
-        var tokenHeader = getToken(),
-            tokenFooter = getToken(),
-            tokenTypekit = getToken();
-
-        // Typekit?
-        if ( pageJson.website.typekitId ) {
-            sqsHeaders.push( '<script src="//use.typekit.com/' + pageJson.website.typekitId + '.js"></script>' );
-            sqsHeaders.push( tokenTypekit );
-
-            scripts.push({
-                token: tokenTypekit,
-                script: '<script>try{Typekit.load();}catch(e){}</script>'
-            });
-        }
-
-        // Headers?
-        sqsHeaders.push( tokenHeader );
-        scripts.push({
-            token: tokenHeader,
-            script: '<script>Static.SQUARESPACE_CONTEXT=' + JSON.stringify( pageJson ) + ';Squarespace.load(window);</script>'
-        });
-
-        // Footers?
-        sqsFooters.push( tokenFooter );
-        scripts.push({
-            token: tokenFooter,
-            script: '<script>Squarespace.afterBodyLoad(Y);</script>'
-        });
+        // Create {squarespace-headers} / {squarespace-footers}
+        setHeaderFooterTokens( pageJson, pageHtml )
 
         // Render {squarespace-headers} to the best of our ability
         rendered = rendered.replace( SQS_HEADERS, sqsHeaders.join( "" ) );
@@ -943,15 +879,15 @@ function onCompositionDone( appRequest, appResponse ) {
         cacheJson = null,
         slugged = slug( appRequest.params[ 0 ] ),
         reqSlug = ( slugged === "" ) ? homepage : slugged,
-        url = (options.siteurl + appRequest.params[ 0 ]),
+        url = (config.server.siteurl + appRequest.params[ 0 ]),
         qrs = {};
 
-    cacheHtml = path.join( options.cacheroot, (reqSlug + ".html") );
-    cacheJson = path.join( options.cacheroot, (reqSlug + ".json") );
+    cacheHtml = path.join( config.server.cacheroot, (reqSlug + ".html") );
+    cacheJson = path.join( config.server.cacheroot, (reqSlug + ".json") );
 
     // JSON cache?
     if ( fs.existsSync( cacheJson ) ) {
-        cacheJson = functions.readJson( path.join( options.cacheroot, (reqSlug + ".json") ) );
+        cacheJson = functions.readJson( path.join( config.server.cacheroot, (reqSlug + ".json") ) );
 
     } else {
         cacheJson = null;
@@ -959,15 +895,15 @@ function onCompositionDone( appRequest, appResponse ) {
 
     // HTML cache?
     if ( fs.existsSync( cacheHtml ) ) {
-        cacheHtml = functions.readFile( path.join( options.cacheroot, (reqSlug + ".html") ) );
+        cacheHtml = functions.readFile( path.join( config.server.cacheroot, (reqSlug + ".html") ) );
 
     } else {
         cacheHtml = null;
     }
 
     // Password?
-    if ( options.password ) {
-        qrs.password = options.password;
+    if ( config.server.password ) {
+        qrs.password = config.server.password;
     }
 
     // Querystring?
@@ -995,7 +931,7 @@ function onCompositionDone( appRequest, appResponse ) {
 
         } else {
             requestJson( url, qrs, function ( json ) {
-                functions.writeJson( path.join( options.cacheroot, (reqSlug + ".json") ), json );
+                functions.writeJson( path.join( config.server.cacheroot, (reqSlug + ".json") ), json );
 
                 appResponse.status( 200 ).json( json );
             });
@@ -1004,8 +940,8 @@ function onCompositionDone( appRequest, appResponse ) {
     // Request page?
     } else {
         requestJsonAndHtml( url, qrs, function ( data ) {
-            functions.writeJson( path.join( options.cacheroot, (reqSlug + ".json") ), data.json );
-            functions.writeFile( path.join( options.cacheroot, (reqSlug + ".html") ), functions.squashHtml( data.html ) );
+            functions.writeJson( path.join( config.server.cacheroot, (reqSlug + ".json") ), data.json );
+            functions.writeFile( path.join( config.server.cacheroot, (reqSlug + ".html") ), functions.squashHtml( data.html ) );
 
             renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
                 appResponse.status( 200 ).send( tpl )
@@ -1032,7 +968,8 @@ function onExpressRouterGET( appRequest, appResponse ) {
             replaceBlocks,
             compileRegions,
             compileCollections,
-            setHeaderFooter
+            setHeaderFooter,
+            setSQSHeadersFooters
         );
 
     // Exit clause...
@@ -1056,23 +993,25 @@ function onExpressRouterGET( appRequest, appResponse ) {
  * @public
  * -------
  * @method init
- * @param {object} config The server.conf json
+ * @param {object} conf The template.conf json
  *
  */
 module.exports = {
-    init: function ( config ) {
-        // Create global options
-        setOptions( config );
+    init: function ( conf ) {
+        // Create global config
+        config = conf;
+
+        // Create global config.server
+        setServerConfig();
 
         // Create global directories
         setDirectories();
 
-        // Copy directories to .server
-        copyDirectoriesToServer();
+        rSQSHeadersFull = new RegExp( "<\\!-- This is Squarespace. --><\\!-- " + config.name.toLowerCase() + " -->(.*?)<\\!-- End of Squarespace Headers -->" );
 
         // Create express application
-        app.use( express.static( options.webroot ) );
-        app.set( "port", options.port );
+        app.use( express.static( config.server.webroot ) );
+        app.set( "port", config.server.port );
         app.get( "*", onExpressRouterGET );
 
         // Create server instance

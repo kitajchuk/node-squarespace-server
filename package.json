@@ -38,7 +38,8 @@
         "ncp": "~0.6",
         "slug": "~0.7",
         "less": "~1.7",
-        "underscore": "~1.7"
+        "underscore": "~1.7",
+        "uglifycss": "0.0.9"
     },
     "keywords": [
         "squarespace",
