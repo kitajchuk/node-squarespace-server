@@ -1,5 +1,5 @@
-squarespace-server
-==================
+node-squarespace-server
+=======================
 
 > A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com/get-started).
 
