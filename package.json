@@ -1,7 +1,7 @@
 {
     "title": "Squarespace Server",
     "name": "squarespace-server",
-    "description": "Node.js server for squarespace sandbox development",
+    "description": "A local Squarespace development server in node.js for folks using the developer platform.",
     "version": "0.1.0",
     "homepage": "https://github.com/kitajchuk/squarespace-server",
     "readmeFilename": "README.md",
@@ -43,6 +43,6 @@
     },
     "keywords": [
         "squarespace",
-        "server"
+        "json-template"
     ]
 }

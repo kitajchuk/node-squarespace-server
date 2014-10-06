@@ -8,8 +8,6 @@
  * - squarespace.page-id
  * - JSON Template Scope Creep
  * - 404 Requests
- * - YUI Implementation
- * - Parse ImageLoader from html
  *
  * @JSONT Errors
  * - work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
@@ -65,6 +63,16 @@ var _ = require( "underscore" ),
     SQS_PAGE_CLASSES = "{squarespace.page-classes}",
     SQS_PAGE_ID = "{squarespace.page-id}",
     SQS_POST_ENTRY = "{squarespace-post-entry}",
+
+    API_GET_SITELAYOUT = "/api/commondata/GetSiteLayout/",
+    //?collectionId
+    API_GET_COLLECTION = "/api/commondata/GetCollection/",
+    API_GET_COLLECTIONS = "/api/commondata/GetCollections/",
+    // ?templateId
+    API_GET_TEMPLATE = "/api/template/GetTemplate/",
+    API_GET_BLOCKFIELDS = "/api/block-fields/",
+    API_GET_WIDGETRENDERING = "/api/widget/GetWidgetRendering/",
+    API_AUTH_LOGIN = "/api/auth/Login/",
 
     undefined_str = "",
     more_predicates = require( "./lib/predicates" ),
@@ -221,12 +229,16 @@ function requestQuery( query, qrs, callback ) {
     slg = path.join( config.server.cacheroot, (slg + ".json") );
 
     // Cached?
-    if ( fs.existsSync( slg ) ) {
+    if ( fs.existsSync( slg ) && qrs.nocache === undefined ) {
         functions.log( "Loading query from cache" );
 
         callback( query, data, functions.readJson( slg ) );
 
     } else {
+        if ( qrs.nocache !== undefined ) {
+            functions.log( "Clearing query cache" );
+        }
+
         request({
             url: url,
             json: true,
@@ -901,6 +913,14 @@ function onCompositionDone( appRequest, appResponse ) {
         cacheHtml = null;
     }
 
+    // Nocache?
+    if (  appRequest.query.nocache !== undefined ) {
+        cacheJson = null;
+        cacheHtml = null;
+
+        functions.log( "Clearing request cache" );
+    }
+
     // Password?
     if ( config.server.password ) {
         qrs.password = config.server.password;
@@ -944,7 +964,7 @@ function onCompositionDone( appRequest, appResponse ) {
             functions.writeFile( path.join( config.server.cacheroot, (reqSlug + ".html") ), functions.squashHtml( data.html ) );
 
             renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
-                appResponse.status( 200 ).send( tpl )
+                appResponse.status( 200 ).send( tpl );
             });
         });
     }
@@ -987,6 +1007,11 @@ function onExpressRouterGET( appRequest, appResponse ) {
 }
 
 
+function onExpressRouterPOST( appRequest, appResponse ) {
+    
+}
+
+
 /**
  *
  * @export
@@ -1007,15 +1032,20 @@ module.exports = {
         // Create global directories
         setDirectories();
 
-        rSQSHeadersFull = new RegExp( "<\\!-- This is Squarespace. --><\\!-- " + config.name.toLowerCase() + " -->(.*?)<\\!-- End of Squarespace Headers -->" );
+        // Regex to match Squarespace Headers
+        rSQSHeadersFull = new RegExp([
+            "<\\!-- This is Squarespace. --><\\!-- ",
+            config.name.toLowerCase(),
+            " -->(.*?)<\\!-- End of Squarespace Headers -->"
+
+        ].join( "" ));
 
         // Create express application
         app.use( express.static( config.server.webroot ) );
         app.set( "port", config.server.port );
         app.get( "*", onExpressRouterGET );
-
-        // Create server instance
-        http.Server( app ).listen( app.get( "port" ) );
+        app.post( "/authlogin", onExpressRouterPOST );
+        app.listen( app.get( "port" ) );
 
         // Log that server is running
         functions.log( ("Running @http://localhost:" + app.get( "port" )) );
