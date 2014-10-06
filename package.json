@@ -1,9 +1,9 @@
 {
-    "title": "Squarespace Server",
-    "name": "squarespace-server",
+    "title": "Node Squarespace Server",
+    "name": "node-squarespace-server",
     "description": "A local Squarespace development server in node.js for folks using the developer platform.",
     "version": "0.1.0",
-    "homepage": "https://github.com/kitajchuk/squarespace-server",
+    "homepage": "https://github.com/kitajchuk/node-squarespace-server",
     "readmeFilename": "README.md",
     "contributors": [
         {
@@ -14,15 +14,15 @@
     ],
     "repository": {
         "type": "git",
-        "url": "git://github.com/kitajchuk/squarespace-server.git"
+        "url": "git://github.com/kitajchuk/node-squarespace-server.git"
     },
     "bugs": {
-        "url": "https://github.com/kitajchuk/squarespace-server/issues"
+        "url": "https://github.com/kitajchuk/node-squarespace-server/issues"
     },
     "licenses": [
         {
             "type": "MIT",
-            "url": "https://github.com/kitajchuk/squarespace-server/blob/master/LICENSE"
+            "url": "https://github.com/kitajchuk/node-squarespace-server/blob/master/LICENSE"
         }
     ],
     "main": "squarespace-server",
