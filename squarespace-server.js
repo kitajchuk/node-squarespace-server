@@ -8,6 +8,8 @@
  * - squarespace.page-id
  * - JSON Template Scope Creep
  * - 404 Requests
+ * - Arguments
+ * - SecureAuthToken
  *
  * @JSONT Errors
  * - work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
@@ -15,6 +17,8 @@
  *
  */
 var _ = require( "underscore" ),
+    bodyParser = require( "body-parser" ),
+    cookieParser = require( "cookie" ),
     express = require( "express" ),
     request = require( "request" ),
     path = require( "path" ),
@@ -45,6 +49,7 @@ var _ = require( "underscore" ),
     rItem = /\.item$/,
     rList = /\.list$/,
     rLess = /\.less$/,
+    rApi = /^\/api/,
 
     // Squarespace content
     rSQSQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
@@ -73,6 +78,8 @@ var _ = require( "underscore" ),
     API_GET_BLOCKFIELDS = "/api/block-fields/",
     API_GET_WIDGETRENDERING = "/api/widget/GetWidgetRendering/",
     API_AUTH_LOGIN = "/api/auth/Login/",
+
+    authToken,
 
     undefined_str = "",
     more_predicates = require( "./lib/predicates" ),
@@ -269,6 +276,8 @@ function requestQuery( query, qrs, callback ) {
  *
  */
 function setServerConfig() {
+    var authFile;
+
     // @global - config
     config.server.siteurl = config.server.siteurl.replace( rSlash, "" );
     config.server.port = 5050;
@@ -280,6 +289,14 @@ function setServerConfig() {
 
         if ( !fs.existsSync( config.server.cacheroot ) ) {
             fs.mkdirSync( config.server.cacheroot );
+        }
+    }
+
+    authFile = path.join( config.server.cacheroot, "secureauth.json" );
+
+    if ( !config.server.secureauth ) {
+        if ( fs.existsSync( authFile ) ) {
+            config.server.secureauth = functions.readFile( authFile );
         }
     }
 }
@@ -973,6 +990,28 @@ function onCompositionDone( appRequest, appResponse ) {
 
 /**
  *
+ * @method processArguments
+ * @param {object} args The arguments array
+ * @private
+ *
+ */
+function processArguments( args ) {
+    var data;
+
+    _.each( args, function ( arg ) {
+        switch ( arg ) {
+            case "--version":
+                data = functions.readJson( path.join( __dirname, "package.json" ) );
+                functions.log( data.version );
+                process.exit();
+            break;
+        }
+    });
+}
+
+
+/**
+ *
  * @method onExpressRouterGET
  * @param {object} appRequest The express request
  * @param {object} appResponse The express response
@@ -993,11 +1032,24 @@ function onExpressRouterGET( appRequest, appResponse ) {
         );
 
     // Exit clause...
-    if ( rIco.test( appRequest.params[ 0 ] ) ) {
+    if ( rIco.test( appRequest.params[ 0 ] ) || rApi.test( appRequest.params[ 0 ] ) ) {
+        functions.log( "URL - " + appRequest.params[ 0 ] + " Not trying it" );
+
+        appResponse.end();
+
         return;
 
     } else {
         functions.log( "GET - " + appRequest.params[ 0 ] );
+    }
+
+    // Authenticated
+    if ( !config.server.secureauth ) {
+        functions.log( "AUTH - Validate yourself!" );
+
+        appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
+
+        return;
     }
 
     // Compose public server
@@ -1007,8 +1059,64 @@ function onExpressRouterGET( appRequest, appResponse ) {
 }
 
 
+/**
+ *
+ * @method onExpressRouterPOST
+ * @param {object} appRequest The express request
+ * @param {object} appResponse The express response
+ * @private
+ *
+ */
 function onExpressRouterPOST( appRequest, appResponse ) {
-    
+    var email = appRequest.body.email,
+        password = appRequest.body.password;
+
+    if ( !email || !password ) {
+        functions.log( "Email AND Password required." );
+
+        appResponse.end();
+
+        return;
+    }
+
+    request({
+        method: "POST",
+        url: (config.server.siteurl + API_AUTH_LOGIN),
+        json: true,
+        headers: headers,
+        form: {
+            email: email,
+            password: password
+        }
+
+    }, function ( error, response, json ) {
+
+        // errors...
+
+        request({
+            url: json.targetWebsite.loginUrl,
+            json: true,
+            headers: headers,
+            qs: {
+                email: email,
+                password: password
+            }
+
+        }, function ( error, response, json ) {
+
+            // errors...
+
+            var cookie = response.headers[ "set-cookie" ].join( ";" );
+
+            config.server.secureauth = cookieParser.parse( cookie );
+
+            functions.writeJson( path.join( config.server.cacheroot, "secureauth.json" ), config.server.secureauth );
+
+            appResponse.redirect( 301, "/" );
+
+        });
+        
+    });
 }
 
 
@@ -1019,12 +1127,16 @@ function onExpressRouterPOST( appRequest, appResponse ) {
  * -------
  * @method init
  * @param {object} conf The template.conf json
+ * @param {object} args The command arguments
  *
  */
 module.exports = {
-    init: function ( conf ) {
+    init: function ( conf, args ) {
         // Create global config
         config = conf;
+
+        // Handle arguments
+        processArguments( args );
 
         // Create global config.server
         setServerConfig();
@@ -1042,9 +1154,11 @@ module.exports = {
 
         // Create express application
         app.use( express.static( config.server.webroot ) );
+        app.use( bodyParser.json() );
+        app.use( bodyParser.urlencoded( {extended: true} ) );
         app.set( "port", config.server.port );
         app.get( "*", onExpressRouterGET );
-        app.post( "/authlogin", onExpressRouterPOST );
+        app.post( "/", onExpressRouterPOST );
         app.listen( app.get( "port" ) );
 
         // Log that server is running

@@ -9,4 +9,4 @@ var fs = require( "fs" ),
     config = ("" + fs.readFileSync( config ));
     config = JSON.parse( config );
 
-server.init( config );
+server.init( config, args );
