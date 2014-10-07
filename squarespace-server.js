@@ -6,14 +6,14 @@
  * - squarespace:block-field
  * - squarespace.page-classes
  * - squarespace.page-id
- * - JSON Template Scope Creep
+ * - JSON Template Scope Creep/Errors
  * - 404 Requests
- * - Arguments
- * - SecureAuthToken
- *
- * @JSONT Errors
- * - work.list - {.if categoryFilter}{categoryFilter}{.or}All{.end}
- * - post-item.block - {.if categories}{.repeated section categories}{@}{.alternates with}{.end}{.end}
+ * - Cache conventions
+ *      - query-*.json
+ *      - page-*.json
+ *      - page-*.html
+ *      - api-*.json
+ *      - secureauth.json
  *
  */
 var _ = require( "underscore" ),
@@ -24,7 +24,7 @@ var _ = require( "underscore" ),
     path = require( "path" ),
     http = require( "http" ),
     fs = require( "fs" ),
-    ncp = require( "ncp" ).ncp,
+    fse = require( "fs-extra" ),
     slug = require( "slug" ),
     less = require( "less" ),
     uglifycss = require( "uglifycss" ),
@@ -79,8 +79,6 @@ var _ = require( "underscore" ),
     API_GET_WIDGETRENDERING = "/api/widget/GetWidgetRendering/",
     API_AUTH_LOGIN = "/api/auth/Login/",
 
-    authToken,
-
     undefined_str = "",
     more_predicates = require( "./lib/predicates" ),
     more_formatters = require( "./lib/formatters" ),
@@ -93,10 +91,6 @@ var _ = require( "underscore" ),
 
     sqsHeaders = [],
     sqsFooters = [],
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36",
-    },
 
     // Squarespace uses /homepage
     homepage = "homepage",
@@ -117,6 +111,19 @@ var _ = require( "underscore" ),
     app = express();
 
 
+function getHeaders( headers ) {
+    var ret = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36"
+    };
+
+    if ( headers ) {
+        ret = _.extend( ret, headers );
+    }
+
+    return ret;
+}
+
+
 /**
  *
  * @method requestHtml
@@ -129,7 +136,7 @@ var _ = require( "underscore" ),
 function requestHtml( url, qrs, callback ) {
     request({
         url: url,
-        headers: headers,
+        headers: getHeaders(),
         qs: qrs
 
     }, function ( error, response, html ) {
@@ -163,7 +170,7 @@ function requestJson( url, qrs, callback ) {
     request({
         url: url,
         json: true,
-        headers: headers,
+        headers: getHeaders(),
         qs: qs
 
     }, function ( error, response, json ) {
@@ -249,7 +256,7 @@ function requestQuery( query, qrs, callback ) {
         request({
             url: url,
             json: true,
-            headers: headers,
+            headers: getHeaders(),
             qs: qs
 
         }, function ( error, response, json ) {
@@ -977,8 +984,8 @@ function onCompositionDone( appRequest, appResponse ) {
     // Request page?
     } else {
         requestJsonAndHtml( url, qrs, function ( data ) {
-            functions.writeJson( path.join( config.server.cacheroot, (reqSlug + ".json") ), data.json );
-            functions.writeFile( path.join( config.server.cacheroot, (reqSlug + ".html") ), functions.squashHtml( data.html ) );
+            functions.writeJson( path.join( config.server.cacheroot, ("page-" + reqSlug + ".json") ), data.json );
+            functions.writeFile( path.join( config.server.cacheroot, ("page-" + reqSlug + ".html") ), functions.squashHtml( data.html ) );
 
             renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
@@ -1003,6 +1010,11 @@ function processArguments( args ) {
             case "--version":
                 data = functions.readJson( path.join( __dirname, "package.json" ) );
                 functions.log( data.version );
+                process.exit();
+            break;
+            case "--refresh":
+                fse.removeSync( path.join( config.server.cacheroot ) );
+                functions.log( "Removed your local .sqs-cache." );
                 process.exit();
             break;
         }
@@ -1068,10 +1080,19 @@ function onExpressRouterGET( appRequest, appResponse ) {
  *
  */
 function onExpressRouterPOST( appRequest, appResponse ) {
-    var email = appRequest.body.email,
-        password = appRequest.body.password;
+    var data = {
+            email: appRequest.body.email,
+            password: appRequest.body.password
+        },
+        apis = [
+            (config.server.siteurl + API_AUTH_LOGIN),
+            (config.server.siteurl + API_GET_SITELAYOUT),
+            (config.server.siteurl + API_GET_COLLECTIONS),
+        ],
+        headers,
+        cookie;
 
-    if ( !email || !password ) {
+    if ( !data.email || !data.password ) {
         functions.log( "Email AND Password required." );
 
         appResponse.end();
@@ -1081,13 +1102,10 @@ function onExpressRouterPOST( appRequest, appResponse ) {
 
     request({
         method: "POST",
-        url: (config.server.siteurl + API_AUTH_LOGIN),
+        url: apis.shift(),
         json: true,
-        headers: headers,
-        form: {
-            email: email,
-            password: password
-        }
+        headers: getHeaders(),
+        form: data
 
     }, function ( error, response, json ) {
 
@@ -1096,23 +1114,52 @@ function onExpressRouterPOST( appRequest, appResponse ) {
         request({
             url: json.targetWebsite.loginUrl,
             json: true,
-            headers: headers,
-            qs: {
-                email: email,
-                password: password
-            }
+            headers: getHeaders(),
+            qs: data
 
         }, function ( error, response, json ) {
 
             // errors...
 
-            var cookie = response.headers[ "set-cookie" ].join( ";" );
+            // Get the response cookie we need
+            cookie = response.headers[ "set-cookie" ].join( ";" );
 
+            // Apply cookie data to config
             config.server.secureauth = cookieParser.parse( cookie );
 
+            // Set request headers we will use
+            headers = getHeaders({
+                "Cookie": cookie
+            });
+
+            // Cache local response header data
             functions.writeJson( path.join( config.server.cacheroot, "secureauth.json" ), config.server.secureauth );
 
-            appResponse.redirect( 301, "/" );
+            function getAPI() {
+                var api = apis.shift();
+
+                request({
+                    url: api,
+                    json: true,
+                    headers: headers,
+                    qs: data
+
+                }, function ( error, response, json ) {
+                    functions.writeJson(
+                        path.join( config.server.cacheroot, (api.replace( config.server.siteurl, "" ).replace( rSlash, "" ).replace( /\//g, "-" ) + ".json") ),
+                        json
+                    );
+
+                    if ( !apis.length ) {
+                        appResponse.redirect( 301, "/" );
+
+                    } else {
+                        getAPI();
+                    }
+                });
+            }
+
+            getAPI();
 
         });
         
@@ -1135,14 +1182,14 @@ module.exports = {
         // Create global config
         config = conf;
 
-        // Handle arguments
-        processArguments( args );
-
         // Create global config.server
         setServerConfig();
 
         // Create global directories
         setDirectories();
+
+        // Handle arguments
+        processArguments( args );
 
         // Regex to match Squarespace Headers
         rSQSHeadersFull = new RegExp([

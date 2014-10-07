@@ -31,10 +31,17 @@ Navigate to your [Squarespace](http://squarespace.com) developer template and ad
 Once you have that, a simple:
 
 ```shell
+# Run the server
 sqs
+
+# Print package version
+sqs --version
+
+# Remove local cache for content refresh
+sqs --refresh
 ```
 
-This runs the [express](http://expressjs.com) server on port `5050` for `localhost`.
+This runs the [express](http://expressjs.com) server on port `5050` for `localhost`. You will first be prompted with a login page. Enter your email and password for YOUR Squarespace account ( used for logging into /config ) that is associated with THIS Squarespace site. This information is not stored anywhere, it is just used to make some initial requests to retrieve data for your site.
 
 
 
