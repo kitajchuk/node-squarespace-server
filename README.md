@@ -4,8 +4,9 @@ node-squarespace-server
 > A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com/get-started).
 
 
+
 ## Installation
-This is NOT finished. But, if you're interested, carry on. This is not yet published to [npm](http://npmjs.org), so your setup is as follows:
+This is NOT finished. I recommend watching this repo if you would like to use it when it is ready. But, if you're interested, carry on. This is not yet published to [npm](http://npmjs.org), so your setup is as follows:
 
 ```shell
 git clone git@github.com:kitajchuk/squarespace-server.git
