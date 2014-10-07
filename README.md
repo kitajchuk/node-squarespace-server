@@ -9,9 +9,9 @@ node-squarespace-server
 This is NOT finished. I recommend watching this repo if you would like to use it when it is ready. But, if you're interested, carry on. This is not yet published to [npm](http://npmjs.org), so your setup is as follows:
 
 ```shell
-git clone git@github.com:kitajchuk/squarespace-server.git
+git clone git@github.com:kitajchuk/node-squarespace-server.git
 
-cd squarespace-server
+cd node-squarespace-server
 
 npm install -g .
 ```
