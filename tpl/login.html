@@ -7,18 +7,36 @@
     <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1" />
 
     <!-- Title -->
-    <title>Squarespace Login</title>
+    <title>Login to Squarespace</title>
 
     <style type="text/css">
-        /* -- forms -- */
+        body,
+        html {
+            background-color: #f2f2f2;
+            font-family: "Helvetica Neue", sans-serif;
+            height: 100%;
+            overflow: hidden;
+            width: 100%;
+        }
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1;
+        }
+        p {
+            margin: 20px 0;
+            font-size: 13px;
+            color: #959595;
+        }
         input {
             background-color: #fff;
-            border: 1px solid #555;
-            color: #555;
+            border: none;
+            color: #3e3e3e;
             display: block;
-            font-size: 18px;
-            margin-bottom: 5px;
-            padding: 20px;
+            font-family: "Helvetica Neue", sans-serif;
+            font-size: 13px;
+            margin-bottom: 10px;
+            padding: 10px;
             width: 100%;
             box-sizing: border-box;
             transition: border-color 400ms ease-out;
@@ -33,34 +51,37 @@
         }
         button {
             border: 0;
-            width: 100%;
         }
         button:focus,
         button:active {
             background-color: #555;
             outline: none;
         }
-        /* - classes: buttons - */
         .btn {
-            background-color: #000;
+            background-color: #3e3e3e;
             color: #fff;
             display: inline-block;
             font-family: "Helvetica Neue", sans-serif;
-            font-size: 18px;
+            font-size: 13px;
             font-weight: normal;
-            padding: 20px 40px;
-            text-transform: uppercase;
+            margin-top: 10px;
+            padding: 10px 40px;
+            border-radius: 100px;
             box-sizing: border-box;
+            transition: background-color 400ms ease-out;
+            -webkit-transition: background-color 400ms ease-out;
         }
-        /* -- login -- */
+        .btn:hover {
+            background-color: #000;
+        }
         #login {
-            height: 205px;
             left: 50%;
-            margin: -100px 0 0 -160px;
+            margin: -113px 0 0 -160px;
             position: absolute;
             top: 50%;
             width: 320px;
             opacity: 0;
+            text-align: center;
             transition: opacity 400ms ease-out;
             -webkit-transition: opacity 400ms ease-out;
         }
@@ -71,8 +92,10 @@
     </head>
     <body>
         <form id="login" action="/" method="post">
-            <input type="text" name="email" value="" placeholder="Email&hellip;" />
-            <input type="password" name="password" value="" placeholder="Password&hellip;" />
+            <h1>Login to Squarespace</h1>
+            <p>Your user info will not be stored anywhere. This authentication simply retrieves data for your site.</p>
+            <input type="text" name="email" value="" placeholder="Email Address" />
+            <input type="password" name="password" value="" placeholder="Password" />
             <button type="submit" class="btn">Login</button>
         </form>
         <script>

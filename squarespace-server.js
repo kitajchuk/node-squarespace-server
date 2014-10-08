@@ -4,6 +4,7 @@
  *
  * @TODOS
  * - squarespace:block-field
+ * - squarespace:navigation
  * - squarespace.page-classes
  * - squarespace.page-id
  * - JSON Template Scope Creep/Errors
@@ -70,11 +71,9 @@ var _ = require( "underscore" ),
     SQS_POST_ENTRY = "{squarespace-post-entry}",
 
     API_GET_SITELAYOUT = "/api/commondata/GetSiteLayout/",
-    //?collectionId
-    API_GET_COLLECTION = "/api/commondata/GetCollection/",
+    API_GET_COLLECTION = "/api/commondata/GetCollection/", //?collectionId
     API_GET_COLLECTIONS = "/api/commondata/GetCollections/",
-    // ?templateId
-    API_GET_TEMPLATE = "/api/template/GetTemplate/",
+    API_GET_TEMPLATE = "/api/template/GetTemplate/", // ?templateId
     API_GET_BLOCKFIELDS = "/api/block-fields/",
     API_GET_WIDGETRENDERING = "/api/widget/GetWidgetRendering/",
     API_AUTH_LOGIN = "/api/auth/Login/",
@@ -111,6 +110,14 @@ var _ = require( "underscore" ),
     app = express();
 
 
+/**
+ *
+ * @method getHeaders
+ * @param {object} headers Merge object with required headers
+ * @returns {object}
+ * @private
+ *
+ */
 function getHeaders( headers ) {
     var ret = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36"
@@ -276,6 +283,8 @@ function requestQuery( query, qrs, callback ) {
  *      cacheroot,
  *      port,
  *      password
+ *      secureauth,
+ *      siteData
  * };
  *
  * @method setServerConfig
@@ -287,7 +296,7 @@ function setServerConfig() {
 
     // @global - config
     config.server.siteurl = config.server.siteurl.replace( rSlash, "" );
-    config.server.port = 5050;
+    config.server.port = (config.server.port || 5050);
     config.server.webroot = process.cwd();
     config.server.protocol = config.server.siteurl.match( rProtocol )[ 0 ];
 
@@ -302,9 +311,17 @@ function setServerConfig() {
     authFile = path.join( config.server.cacheroot, "secureauth.json" );
 
     if ( !config.server.secureauth ) {
+        config.server.siteData = {};
+
         if ( fs.existsSync( authFile ) ) {
             config.server.secureauth = functions.readFile( authFile );
         }
+
+    } else {
+        config.server.siteData = {
+            collections: functions.readJson( path.join( config.server.cacheroot, "api-commondata-GetCollections.json" ) ),
+            siteLayout: functions.readJson( path.join( config.server.cacheroot, "api-commondata-GetSiteLayout.json" ) )
+        };
     }
 }
 
@@ -685,6 +702,12 @@ function replaceNavigations( rendered, pageHtml ) {
 
     if ( matched ) {
         for ( i = 0, len = matched.length; i < len; i++ ) {
+            // loop config.server.siteData.siteLayout
+            // match attrs.navigationId to identifier
+            // iterate links and build navigation object
+            // { active: false, folderActive: false, items: [], website: {} }
+            // render template with json-template
+
             attrs = functions.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
             filed = ("" + fs.readFileSync( path.join( directories.blocks, block ) )).split( "\n" );
@@ -1100,6 +1123,7 @@ function onExpressRouterPOST( appRequest, appResponse ) {
         return;
     }
 
+    // POST to login
     request({
         method: "POST",
         url: apis.shift(),
@@ -1108,9 +1132,9 @@ function onExpressRouterPOST( appRequest, appResponse ) {
         form: data
 
     }, function ( error, response, json ) {
-
         // errors...
 
+        // Request to TokenLogin
         request({
             url: json.targetWebsite.loginUrl,
             json: true,
@@ -1118,7 +1142,6 @@ function onExpressRouterPOST( appRequest, appResponse ) {
             qs: data
 
         }, function ( error, response, json ) {
-
             // errors...
 
             // Get the response cookie we need
@@ -1135,8 +1158,10 @@ function onExpressRouterPOST( appRequest, appResponse ) {
             // Cache local response header data
             functions.writeJson( path.join( config.server.cacheroot, "secureauth.json" ), config.server.secureauth );
 
+            // Fetch site API data
             function getAPI() {
-                var api = apis.shift();
+                var api = apis.shift(),
+                    pathName = path.join( config.server.cacheroot, (api.replace( config.server.siteurl, "" ).replace( rSlash, "" ).replace( /\//g, "-" ) + ".json") );
 
                 request({
                     url: api,
@@ -1145,24 +1170,24 @@ function onExpressRouterPOST( appRequest, appResponse ) {
                     qs: data
 
                 }, function ( error, response, json ) {
-                    functions.writeJson(
-                        path.join( config.server.cacheroot, (api.replace( config.server.siteurl, "" ).replace( rSlash, "" ).replace( /\//g, "-" ) + ".json") ),
-                        json
-                    );
+                    functions.writeJson( pathName, json );
 
+                    // All done, load the site
                     if ( !apis.length ) {
+                        config.server.siteData.collections = json;
+
                         appResponse.redirect( 301, "/" );
 
                     } else {
+                        config.server.siteData.siteLayout = json;
+
                         getAPI();
                     }
                 });
             }
 
             getAPI();
-
         });
-        
     });
 }
 
