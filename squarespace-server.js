@@ -4,7 +4,6 @@
  *
  * @TODOS
  * - squarespace:block-field
- * - squarespace:navigation
  * - squarespace.page-classes
  * - squarespace.page-id
  * - JSON Template Scope Creep/Errors
@@ -108,6 +107,28 @@ var _ = require( "underscore" ),
     templates = {},
 
     app = express();
+
+
+/**
+ *
+ * @method lookupCollection
+ * @param {string} id The collection ID
+ * @returns {object}
+ * @private
+ *
+ */
+function lookupCollection( id ) {
+    var collection = null;
+
+    for ( var i in config.server.siteData.collections.collections ) {
+        if ( i === id ) {
+            collection = config.server.siteData.collections.collections[ id ];
+            break;
+        }
+    }
+
+    return collection;
+}
 
 
 /**
@@ -682,43 +703,58 @@ function replaceSQSTags( rendered, pageJson ) {
  *
  * @method replaceNavigations
  * @param {string} rendered The template rendering
- * @param {string} pageHtml The HTML for the page
+ * @param {string} pageJson The JSON for the page
  * @returns {string}
  * @private
  *
  */
-function replaceNavigations( rendered, pageHtml ) {
-    var attrs,
+function replaceNavigations( rendered, pageJson ) {
+    var context = {
+            active: false,
+            folderActive: false,
+            website: pageJson.website,
+            items: []
+        },
         block,
-        filed,
-        open,
-        close,
-        regex,
+        items,
+        attrs,
         matched,
-        match;
+        template,
+        i,
+        iLen,
+        j,
+        k,
+        kLen;
 
     // SQS Navigations
     matched = rendered.match( rSQSNavis );
 
     if ( matched ) {
-        for ( i = 0, len = matched.length; i < len; i++ ) {
-            // loop config.server.siteData.siteLayout
-            // match attrs.navigationId to identifier
-            // iterate links and build navigation object
-            // { active: false, folderActive: false, items: [], website: {} }
-            // render template with json-template
-
+        for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
             attrs = functions.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
-            filed = ("" + fs.readFileSync( path.join( directories.blocks, block ) )).split( "\n" );
-            open = filed.shift();
-            close = filed.pop();
-            regex = new RegExp( open + "(.*?)" + close );
-            match = pageHtml.match( regex );
+            template = functions.readFile( path.join( directories.blocks, block ) );
 
-            if ( match ) {
-                rendered = rendered.replace( matched[ i ], match[ 0 ] );
+            for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
+                if ( config.server.siteData.siteLayout.layout[ j ].identifier === attrs.navigationId ) {
+                    items = [];
+
+                    for ( var k = 0, kLen = config.server.siteData.siteLayout.layout[ j ].links.length; k < kLen; k++ ) {
+                        items.push({
+                            active: false,
+                            folderActive: false,
+                            collection: lookupCollection( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId )
+                        });
+                    }
+
+                    context.items = items;
+                }
             }
+
+            template = jsonTemplate.Template( template, jsontOptions );
+            template = template.expand( context );
+
+            rendered = rendered.replace( matched[ i ], template );
         }
     }
 
@@ -865,7 +901,7 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
         rendered = rendered.replace( SQS_FOOTERS, sqsFooters.join( "" ) );
 
         // Render Navigations from pageHtml
-        rendered = replaceNavigations( rendered, pageHtml );
+        rendered = replaceNavigations( rendered, pageJson );
 
         // Render Block Fields
         rendered = replaceBlockFields( rendered );
