@@ -15,7 +15,9 @@
             background-color: #f2f2f2;
             font-family: "Helvetica Neue", sans-serif;
             height: 100%;
+            margin: 0;
             overflow: hidden;
+            padding: 0;
             width: 100%;
         }
         h1 {
@@ -88,19 +90,106 @@
         #login.is-active {
             opacity: 1;
         }
+        /* http://tobiasahlin.com/spinkit/ */
+        #spinner {
+            text-align: center;
+            left: 0;
+            margin-top: -9px;
+            position: absolute;
+            top: 50%;
+            right: 0;
+            display: none;
+        }
+        #spinner.is-active {
+            display: block;
+        }
+        #spinner > div {
+            width: 10px;
+            height: 10px;
+            background-color: #3e3e3e;
+            margin: 0 3px;
+            border-radius: 100%;
+            display: inline-block;
+            -webkit-animation: bouncedelay 1.4s infinite ease-in-out;
+            animation: bouncedelay 1.4s infinite ease-in-out;
+            /* Prevent first frame from flickering when animation starts */
+            -webkit-animation-fill-mode: both;
+            animation-fill-mode: both;
+        }
+        #spinner .bounce1 {
+            -webkit-animation-delay: -0.32s;
+            animation-delay: -0.32s;
+        }
+        #spinner .bounce2 {
+            -webkit-animation-delay: -0.16s;
+            animation-delay: -0.16s;
+        }
+        @-webkit-keyframes bouncedelay {
+            0%, 80%, 100% { -webkit-transform: scale(0.0) }
+            40% { -webkit-transform: scale(1.0) }
+        }
+        @keyframes bouncedelay {
+            0%, 80%, 100% { 
+                transform: scale(0.0);
+                -webkit-transform: scale(0.0);
+            }
+            40% { 
+                transform: scale(1.0);
+                -webkit-transform: scale(1.0);
+            }
+        }
     </style>
     </head>
     <body>
         <form id="login" action="/" method="post">
             <h1>Login to Squarespace</h1>
             <p>Your user info will not be stored anywhere. This authentication simply retrieves data for your site.</p>
-            <input type="text" name="email" value="" placeholder="Email Address" />
-            <input type="password" name="password" value="" placeholder="Password" />
+            <input id="email" type="text" name="email" value="" placeholder="Email Address" />
+            <input id="password" type="password" name="password" value="" placeholder="Password" />
             <button type="submit" class="btn">Login</button>
         </form>
+        <div id="spinner">
+          <div class="bounce1"></div>
+          <div class="bounce2"></div>
+          <div class="bounce3"></div>
+        </div>
         <script>
+            var login = document.getElementById( "login" ),
+                email = document.getElementById( "email" ),
+                password = document.getElementById( "password" ),
+                spinner = document.getElementById( "spinner" ),
+                isPosting = false;
+
+            login.addEventListener( "submit", function ( e ) {
+                if ( isPosting ) {
+                    return;
+                }
+
+                isPosting = true;
+
+                var xhr = new XMLHttpRequest();
+                xhr.open( "POST", this.action, true );
+                xhr.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded" );
+
+                xhr.onreadystatechange = function ( e ) {
+                    if ( this.readyState === 4 ) {
+                        if ( this.status === 200 ) {
+                            window.location.reload();
+                        }
+                    }
+                };
+
+                xhr.send( "email=" + email.value + "&password=" + password.value );
+
+                login.className = "";
+                spinner.className = "is-active";
+
+                e.preventDefault();
+
+            }, false );
+
             setTimeout(function () {
-                document.getElementById( "login" ).className = "is-active";
+                login.className = "is-active";
 
             }, 500 );
         </script>

@@ -728,6 +728,19 @@ function replaceNavigations( rendered, pageHtml ) {
 
 /**
  *
+ * @method replaceBlockFields
+ * @param {string} rendered The template rendering
+ * @returns {string}
+ * @private
+ *
+ */
+function replaceBlockFields( rendered ) {
+    return rendered;
+}
+
+
+/**
+ *
  * @method replaceClickThroughUrls
  * @param {string} rendered The template rendering
  * @returns {string}
@@ -854,6 +867,9 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
         // Render Navigations from pageHtml
         rendered = replaceNavigations( rendered, pageHtml );
 
+        // Render Block Fields
+        rendered = replaceBlockFields( rendered );
+
         // Render full clickThroughUrl's
         rendered = replaceClickThroughUrls( rendered );
 
@@ -898,8 +914,6 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
             requestQuery( queries.shift(), qrs, handleQueried );
 
         } else {
-            functions.log( "Queries finished" );
-
             handleDone();
         }
     }
@@ -1026,19 +1040,32 @@ function onCompositionDone( appRequest, appResponse ) {
  *
  */
 function processArguments( args ) {
-    var data;
+    var data = functions.readJson( path.join( __dirname, "package.json" ) );
+
+    if ( !args || !args.length ) {
+        console.log( "Squarespace Server" );
+        console.log( "Version " + data.version );
+        console.log();
+        console.log( "Options:" );
+        console.log( "sqs --version    Print package version" );
+        console.log( "sqs --buster     Delete local site cache" );
+        console.log( "sqs --server     Start the local server" );
+        process.exit();
+    }
 
     _.each( args, function ( arg ) {
         switch ( arg ) {
             case "--version":
-                data = functions.readJson( path.join( __dirname, "package.json" ) );
                 functions.log( data.version );
                 process.exit();
             break;
-            case "--refresh":
+            case "--buster":
                 fse.removeSync( path.join( config.server.cacheroot ) );
-                functions.log( "Removed your local .sqs-cache." );
+                functions.log( "Trashed your local .sqs-cache." );
                 process.exit();
+            break;
+            case "--server":
+                startServer();
             break;
         }
     });
@@ -1080,7 +1107,7 @@ function onExpressRouterGET( appRequest, appResponse ) {
 
     // Authenticated
     if ( !config.server.secureauth ) {
-        functions.log( "AUTH - Validate yourself!" );
+        functions.log( "AUTH - Login to Squarespace!" );
 
         appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
 
@@ -1118,7 +1145,7 @@ function onExpressRouterPOST( appRequest, appResponse ) {
     if ( !data.email || !data.password ) {
         functions.log( "Email AND Password required." );
 
-        appResponse.end();
+        appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
 
         return;
     }
@@ -1176,7 +1203,9 @@ function onExpressRouterPOST( appRequest, appResponse ) {
                     if ( !apis.length ) {
                         config.server.siteData.collections = json;
 
-                        appResponse.redirect( 301, "/" );
+                        appResponse.json({
+                            success: true
+                        });
 
                     } else {
                         config.server.siteData.siteLayout = json;
@@ -1189,6 +1218,35 @@ function onExpressRouterPOST( appRequest, appResponse ) {
             getAPI();
         });
     });
+}
+
+
+/**
+ *
+ * @method startServer
+ * @private
+ *
+ */
+function startServer() {
+    // Regex to match Squarespace Headers
+    rSQSHeadersFull = new RegExp([
+        "<\\!-- This is Squarespace. --><\\!-- ",
+        config.name.toLowerCase(),
+        " -->(.*?)<\\!-- End of Squarespace Headers -->"
+
+    ].join( "" ));
+
+    // Create express application
+    app.use( express.static( config.server.webroot ) );
+    app.use( bodyParser.json() );
+    app.use( bodyParser.urlencoded( {extended: true} ) );
+    app.set( "port", config.server.port );
+    app.get( "*", onExpressRouterGET );
+    app.post( "/", onExpressRouterPOST );
+    app.listen( app.get( "port" ) );
+
+    // Log that server is running
+    functions.log( ("Running @http://localhost:" + app.get( "port" )) );
 }
 
 
@@ -1215,25 +1273,5 @@ module.exports = {
 
         // Handle arguments
         processArguments( args );
-
-        // Regex to match Squarespace Headers
-        rSQSHeadersFull = new RegExp([
-            "<\\!-- This is Squarespace. --><\\!-- ",
-            config.name.toLowerCase(),
-            " -->(.*?)<\\!-- End of Squarespace Headers -->"
-
-        ].join( "" ));
-
-        // Create express application
-        app.use( express.static( config.server.webroot ) );
-        app.use( bodyParser.json() );
-        app.use( bodyParser.urlencoded( {extended: true} ) );
-        app.set( "port", config.server.port );
-        app.get( "*", onExpressRouterGET );
-        app.post( "/", onExpressRouterPOST );
-        app.listen( app.get( "port" ) );
-
-        // Log that server is running
-        functions.log( ("Running @http://localhost:" + app.get( "port" )) );
     }
 };
