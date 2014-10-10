@@ -795,8 +795,23 @@ function replaceNavigations( rendered, pageJson ) {
  *
  */
 function replaceBlockFields( rendered, callback ) {
-    var matched;
+    var content = "",
+        matched;
 
+    // TEMP, until this is figured out
+    matched = rendered.match( rSQSBlockFields );
+
+    if ( matched ) {
+        for ( var i = 0, len = matched.length; i < len; i++ ) {
+            var attrs = functions.getAttrObj( matched[ i ] );
+
+            rendered = rendered.replace( matched[ i ], attrs.id );
+        }
+    }
+
+    callback( rendered );
+
+/*
     // SQS Block Fields
     matched = rendered.match( rSQSBlockFields );
 
@@ -804,7 +819,8 @@ function replaceBlockFields( rendered, callback ) {
         loginPortal(function ( headers ) {
             function getBlock() {
                 var block = matched.shift(),
-                    attrs = functions.getAttrObj( block );
+                    attrs = functions.getAttrObj( block ),
+                    crumb = cookieParser.parse( headers.Cookie ).crumb;
 
                 request({
                     url: (config.server.siteurl + API_GET_BLOCKFIELDS + attrs.id),
@@ -813,7 +829,35 @@ function replaceBlockFields( rendered, callback ) {
                     qs: sqsUserData
 
                 }, function ( error, response, json ) {
-                    console.log( json );
+                    var rows = json.data.layout.rows,
+                        rLen = rows.length;
+
+                    // rows > columns > blocks
+                    for ( var i = 0; i < rLen; i++ ) {
+                        var columns = rows[ i ].columns,
+                            cLen = columns.length;
+
+                        for ( var j = 0; j < cLen; j++ ) {
+                            var blocks = columns[ j ].blocks,
+                                bLen = blocks.length;
+
+                            request({
+                                url: (config.server.siteurl + API_GET_WIDGETRENDERING),
+                                method: "POST",
+                                headers: headers,
+                                qs: {
+                                    crumb: crumb
+                                },
+                                form: {
+                                    widgetJSON: blocks[ j ],
+                                    collectionId: ""
+                                }
+
+                            }, function ( error, response, resp ) {
+                                console.log( resp );
+                            });
+                        }
+                    }
 
                     if ( !matched.length ) {
                         callback( rendered );
@@ -827,6 +871,7 @@ function replaceBlockFields( rendered, callback ) {
             getBlock();
         });
     }
+*/
 }
 
 
