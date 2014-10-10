@@ -41,7 +41,8 @@
         "uglifycss": "0.0.9",
         "body-parser": "~1.9",
         "cookie": "~0.1",
-        "fs-extra": "~0.12"
+        "fs-extra": "~0.12",
+        "moment": "~2.8"
     },
     "keywords": [
         "squarespace",

@@ -122,7 +122,13 @@ var _ = require( "underscore" ),
 function renderJsonTemplate( render, data ) {
     // Formalize .if to .section and avoid json-template blowing up
     // This fixes issues with nested .repeated sections within a .if
-    render = render.replace( rDotIf, "{.section" );
+    var match;
+
+    while ( match = render.match( /\{\.if\s(.*?)\}/ ) ) {
+        render = render.replace( match[ 0 ], "{.section " + match[ 1 ] + "}" );
+        render = render.replace( new RegExp( "{.repeated section " + match[ 1 ] + "}" ), "{.repeated section @}" );
+    }
+
     render = jsonTemplate.Template( render, jsontOptions );
     render = render.expand( data );
 
