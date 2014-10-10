@@ -903,6 +903,9 @@ function replaceBlockFields( rendered, callback ) {
 
             getBlock();
         });
+
+    } else {
+        callback( rendered );
     }
 }
 
@@ -1024,7 +1027,7 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
 
     function handleDone() {
         // Create {squarespace-headers} / {squarespace-footers}
-        setHeaderFooterTokens( pageJson, pageHtml )
+        setHeaderFooterTokens( pageJson, pageHtml );
 
         // Render {squarespace-headers} to the best of our ability
         rendered = rendered.replace( SQS_HEADERS, sqsHeaders.join( "" ) );
