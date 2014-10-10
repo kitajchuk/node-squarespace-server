@@ -47,6 +47,7 @@ var _ = require( "underscore" ),
     rList = /\.list$/,
     rLess = /\.less$/,
     rApi = /^\/api/,
+    rDotIf = /\{\.if/g,
 
     // Squarespace content
     rSQSQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
@@ -107,6 +108,26 @@ var _ = require( "underscore" ),
     templates = {},
 
     app = express();
+
+
+/**
+ *
+ * @method renderJsonTemplate
+ * @param {string} render The template string
+ * @param {object} data The data context
+ * @returns {string}
+ * @private
+ *
+ */
+function renderJsonTemplate( render, data ) {
+    // Formalize .if to .section and avoid json-template blowing up
+    // This fixes issues with nested .repeated sections within a .if
+    render = render.replace( rDotIf, "{.section" );
+    render = jsonTemplate.Template( render, jsontOptions );
+    render = render.expand( data );
+
+    return render;
+}
 
 
 /**
@@ -777,8 +798,7 @@ function replaceNavigations( rendered, pageJson ) {
                 }
             }
 
-            template = jsonTemplate.Template( template, jsontOptions );
-            template = template.expand( context );
+            template = renderJsonTemplate( template, context );
 
             rendered = rendered.replace( matched[ i ], template );
         }
@@ -1042,8 +1062,7 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
         rendered = replaceClickThroughUrls( rendered );
 
         // Render w/jsontemplate
-        rendered = jsonTemplate.Template( rendered, jsontOptions );
-        rendered = rendered.expand( pageJson );
+        rendered = renderJsonTemplate( rendered, pageJson );
 
         // Add token scripts back into the template
         for ( var i = scripts.length; i--; ) {
@@ -1075,8 +1094,7 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
                 json.items.splice( 0, (json.items.length - data.limit) );
             }
 
-            tpl = jsonTemplate.Template( query[ 2 ], jsontOptions );
-            tpl = tpl.expand( json );
+            tpl = renderJsonTemplate( query[ 2 ], json );
 
             rendered = rendered.replace( query[ 2 ], tpl );
         }
