@@ -2,13 +2,8 @@
  *
  * Squarespace node server.
  *
- * @TODOS
- * - squarespace:block-field
- * - squarespace.page-classes
- * - squarespace.page-id
- * - JSON Template Scope Creep/Errors
- * - 404 Requests
  * - Cache conventions
+ *      - block-*.html
  *      - query-*.json
  *      - page-*.json
  *      - page-*.html
@@ -90,6 +85,9 @@ var _ = require( "underscore" ),
     sqsHeaders = [],
     sqsFooters = [],
 
+    // Squarespace login required
+    sqsUserData = null,
+
     // Squarespace uses /homepage
     homepage = "homepage",
 
@@ -107,6 +105,49 @@ var _ = require( "underscore" ),
     templates = {},
 
     app = express();
+
+
+/**
+ *
+ * @method loginPortal
+ * @param {function} callback Fired when login and headers are set
+ * @private
+ *
+ */
+function loginPortal( callback ) {
+    // POST to login
+    request({
+        method: "POST",
+        url: (config.server.siteurl + API_AUTH_LOGIN),
+        json: true,
+        headers: getHeaders(),
+        form: sqsUserData
+
+    }, function ( error, response, json ) {
+        // errors...
+
+        // Request to TokenLogin
+        request({
+            url: json.targetWebsite.loginUrl,
+            json: true,
+            headers: getHeaders(),
+            qs: sqsUserData
+
+        }, function ( error, response, json ) {
+            // errors...
+
+            // Get the response cookie we need
+            var cookie = response.headers[ "set-cookie" ].join( ";" );
+
+            // Set request headers we will use
+            headers = getHeaders({
+                "Cookie": cookie
+            });
+
+            callback( headers );
+        });
+    });
+}
 
 
 /**
@@ -313,13 +354,12 @@ function requestQuery( query, qrs, callback ) {
  *
  */
 function setServerConfig() {
-    var authFile;
-
     // @global - config
     config.server.siteurl = config.server.siteurl.replace( rSlash, "" );
     config.server.port = (config.server.port || 5050);
     config.server.webroot = process.cwd();
     config.server.protocol = config.server.siteurl.match( rProtocol )[ 0 ];
+    config.server.siteData = {};
 
     if ( !config.server.cacheroot ) {
         config.server.cacheroot = path.join( config.server.webroot, ".sqs-cache" );
@@ -327,22 +367,6 @@ function setServerConfig() {
         if ( !fs.existsSync( config.server.cacheroot ) ) {
             fs.mkdirSync( config.server.cacheroot );
         }
-    }
-
-    authFile = path.join( config.server.cacheroot, "secureauth.json" );
-
-    if ( !config.server.secureauth ) {
-        config.server.siteData = {};
-
-        if ( fs.existsSync( authFile ) ) {
-            config.server.secureauth = functions.readFile( authFile );
-        }
-
-    } else {
-        config.server.siteData = {
-            collections: functions.readJson( path.join( config.server.cacheroot, "api-commondata-GetCollections.json" ) ),
-            siteLayout: functions.readJson( path.join( config.server.cacheroot, "api-commondata-GetSiteLayout.json" ) )
-        };
     }
 }
 
@@ -766,12 +790,43 @@ function replaceNavigations( rendered, pageJson ) {
  *
  * @method replaceBlockFields
  * @param {string} rendered The template rendering
- * @returns {string}
+ * @param {function} callback The callback when done rendering
  * @private
  *
  */
-function replaceBlockFields( rendered ) {
-    return rendered;
+function replaceBlockFields( rendered, callback ) {
+    var matched;
+
+    // SQS Block Fields
+    matched = rendered.match( rSQSBlockFields );
+
+    if ( matched ) {
+        loginPortal(function ( headers ) {
+            function getBlock() {
+                var block = matched.shift(),
+                    attrs = functions.getAttrObj( block );
+
+                request({
+                    url: (config.server.siteurl + API_GET_BLOCKFIELDS + attrs.id),
+                    json: true,
+                    headers: headers,
+                    qs: sqsUserData
+
+                }, function ( error, response, json ) {
+                    console.log( json );
+
+                    if ( !matched.length ) {
+                        callback( rendered );
+
+                    } else {
+                        getBlock();
+                    }
+                });
+            }
+
+            getBlock();
+        });
+    }
 }
 
 
@@ -903,9 +958,6 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
         // Render Navigations from pageHtml
         rendered = replaceNavigations( rendered, pageJson );
 
-        // Render Block Fields
-        rendered = replaceBlockFields( rendered );
-
         // Render full clickThroughUrl's
         rendered = replaceClickThroughUrls( rendered );
 
@@ -918,7 +970,10 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
             rendered = rendered.replace( scripts[ i ].token, scripts[ i ].script );
         }
 
-        callback( rendered );
+        // Render Block Fields
+        replaceBlockFields( rendered, function ( finalRender ) {
+            callback( finalRender );
+        });
     }
 
     function handleQueried( query, data, json ) {
@@ -1142,7 +1197,7 @@ function onExpressRouterGET( appRequest, appResponse ) {
     }
 
     // Authenticated
-    if ( !config.server.secureauth ) {
+    if ( !sqsUserData ) {
         functions.log( "AUTH - Login to Squarespace!" );
 
         appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
@@ -1171,12 +1226,9 @@ function onExpressRouterPOST( appRequest, appResponse ) {
             password: appRequest.body.password
         },
         apis = [
-            (config.server.siteurl + API_AUTH_LOGIN),
             (config.server.siteurl + API_GET_SITELAYOUT),
             (config.server.siteurl + API_GET_COLLECTIONS),
-        ],
-        headers,
-        cookie;
+        ];
 
     if ( !data.email || !data.password ) {
         functions.log( "Email AND Password required." );
@@ -1186,73 +1238,40 @@ function onExpressRouterPOST( appRequest, appResponse ) {
         return;
     }
 
-    // POST to login
-    request({
-        method: "POST",
-        url: apis.shift(),
-        json: true,
-        headers: getHeaders(),
-        form: data
+    sqsUserData = data;
 
-    }, function ( error, response, json ) {
-        // errors...
+    loginPortal(function ( headers ) {
+        // Fetch site API data
+        function getAPI() {
+            var api = apis.shift(),
+                pathName = path.join( config.server.cacheroot, (api.replace( config.server.siteurl, "" ).replace( rSlash, "" ).replace( /\//g, "-" ) + ".json") );
 
-        // Request to TokenLogin
-        request({
-            url: json.targetWebsite.loginUrl,
-            json: true,
-            headers: getHeaders(),
-            qs: data
+            request({
+                url: api,
+                json: true,
+                headers: headers,
+                qs: sqsUserData
 
-        }, function ( error, response, json ) {
-            // errors...
+            }, function ( error, response, json ) {
+                functions.writeJson( pathName, json );
 
-            // Get the response cookie we need
-            cookie = response.headers[ "set-cookie" ].join( ";" );
+                // All done, load the site
+                if ( !apis.length ) {
+                    config.server.siteData.collections = json;
 
-            // Apply cookie data to config
-            config.server.secureauth = cookieParser.parse( cookie );
+                    appResponse.json({
+                        success: true
+                    });
 
-            // Set request headers we will use
-            headers = getHeaders({
-                "Cookie": cookie
+                } else {
+                    config.server.siteData.siteLayout = json;
+
+                    getAPI();
+                }
             });
+        }
 
-            // Cache local response header data
-            functions.writeJson( path.join( config.server.cacheroot, "secureauth.json" ), config.server.secureauth );
-
-            // Fetch site API data
-            function getAPI() {
-                var api = apis.shift(),
-                    pathName = path.join( config.server.cacheroot, (api.replace( config.server.siteurl, "" ).replace( rSlash, "" ).replace( /\//g, "-" ) + ".json") );
-
-                request({
-                    url: api,
-                    json: true,
-                    headers: headers,
-                    qs: data
-
-                }, function ( error, response, json ) {
-                    functions.writeJson( pathName, json );
-
-                    // All done, load the site
-                    if ( !apis.length ) {
-                        config.server.siteData.collections = json;
-
-                        appResponse.json({
-                            success: true
-                        });
-
-                    } else {
-                        config.server.siteData.siteLayout = json;
-
-                        getAPI();
-                    }
-                });
-            }
-
-            getAPI();
-        });
+        getAPI();
     });
 }
 
