@@ -8,7 +8,6 @@
  *      - page-*.json
  *      - page-*.html
  *      - api-*.json
- *      - secureauth.json
  *
  */
 var _ = require( "underscore" ),
@@ -120,6 +119,7 @@ var _ = require( "underscore" ),
  *
  */
 function renderJsonTemplate( render, data ) {
+    // TEMPORARY SOLUTION!
     // Formalize .if to .section and avoid json-template blowing up
     // This fixes issues with nested .repeated sections within a .if
     var match;
@@ -793,11 +793,16 @@ function replaceNavigations( rendered, pageJson ) {
                     items = [];
 
                     for ( var k = 0, kLen = config.server.siteData.siteLayout.layout[ j ].links.length; k < kLen; k++ ) {
-                        items.push({
-                            active: false,
-                            folderActive: false,
-                            collection: lookupCollection( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId )
-                        });
+                        if ( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId ) {
+                            items.push({
+                                active: false,
+                                folderActive: false,
+                                collection: lookupCollection( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId )
+                            });
+
+                        } else {
+                            items.push( config.server.siteData.siteLayout.layout[ j ].links[ k ] );
+                        }
                     }
 
                     context.items = items;
@@ -854,40 +859,46 @@ function replaceBlockFields( rendered, callback ) {
     if ( matched ) {
         loginPortal(function ( headers ) {
             function loopBlocks( block, attrs, json ) {
-                var rows = json.data.layout.rows,
-                    rLen = rows.length,
+                var rows,
+                    rLen,
+                    html;
+
+                if ( json ) {
+                    rows = json.data.layout.rows;
+                    rLen = rows.length;
                     html = '<div id="' + attrs.id + '" class="sqs-layout sqs-grid-' + json.data.layout.columns + ' columns-' + json.data.layout.columns + (attrs["locked-layout"] ? ' sqs-locked-layout' : '') + '" data-type="block-field" data-updated-on="' + json.data.updatedOn + '">';
 
-                // rows > columns > blocks
-                for ( var i = 0; i < rLen; i++ ) {
-                    var columns = rows[ i ].columns,
-                        cLen = columns.length;
+                    // rows > columns > blocks
+                    for ( var i = 0; i < rLen; i++ ) {
+                        var columns = rows[ i ].columns,
+                            cLen = columns.length;
 
-                    html += '<div class="row sqs-row">';
+                        html += '<div class="row sqs-row">';
 
-                    for ( var j = 0; j < cLen; j++ ) {
-                        var blocks = columns[ j ].blocks,
-                            bLen = blocks.length;
+                        for ( var j = 0; j < cLen; j++ ) {
+                            var blocks = columns[ j ].blocks,
+                                bLen = blocks.length;
 
-                        html += '<div class="col sqs-col-' + (12 / attrs.columns) + ' span-' + columns[ j ].span + '">';
+                            html += '<div class="col sqs-col-' + (12 / attrs.columns) + ' span-' + columns[ j ].span + '">';
 
-                        for ( var k = 0; k < bLen; k++ ) {
-                            for ( var b in blocktypes ) {
-                                if ( blocks[ k ].type === blocktypes[ b ] && blocks[ k ].value.html !== "" ) {
-                                    html += renderBlockField( blocks[ k ], b );
+                            for ( var k = 0; k < bLen; k++ ) {
+                                for ( var b in blocktypes ) {
+                                    if ( blocks[ k ].type === blocktypes[ b ] && blocks[ k ].value.html !== "" ) {
+                                        html += renderBlockField( blocks[ k ], b );
+                                    }
                                 }
                             }
+
+                            html += '</div>';
                         }
 
                         html += '</div>';
                     }
 
                     html += '</div>';
+
+                    rendered = rendered.replace( block, html );
                 }
-
-                html += '</div>';
-
-                rendered = rendered.replace( block, html );
 
                 if ( !matched.length ) {
                     callback( rendered );
@@ -970,33 +981,12 @@ function replaceClickThroughUrls( rendered ) {
  *
  */
 function setHeaderFooterTokens( pageJson, pageHtml ) {
-    var tokenTypekit = getToken(),
-        tokenHeadersFull = getToken(),
+    var tokenHeadersFull = getToken(),
         tokenFootersFull = getToken(),
         sHeadersFull = pageHtml.match( rSQSHeadersFull ),
         sFootersFull = pageHtml.match( rSQSFootersFull ),
         siteStyleTag = null,
         sSiteCssMatch;
-
-    // Typekit?
-    if ( pageJson.website.typekitId ) {
-        sqsHeaders.push( '<script src="//use.typekit.com/' + pageJson.website.typekitId + '.js"></script>' );
-        sqsHeaders.push( tokenTypekit );
-
-        scripts.push({
-            token: tokenTypekit,
-            script: '<script>try{Typekit.load();}catch(e){}</script>'
-        });
-    }
-
-    // Footers?
-    if ( sFootersFull ) {
-        sqsFooters.push( tokenFootersFull );
-        scripts.push({
-            token: tokenFootersFull,
-            script: sFootersFull[ 0 ]
-        });
-    }
 
     // Headers?
     if ( sHeadersFull ) {
@@ -1009,6 +999,15 @@ function setHeaderFooterTokens( pageJson, pageHtml ) {
         scripts.push({
             token: tokenHeadersFull,
             script: sHeadersFull
+        });
+    }
+
+    // Footers?
+    if ( sFootersFull ) {
+        sqsFooters.push( tokenFootersFull );
+        scripts.push({
+            token: tokenFootersFull,
+            script: sFootersFull[ 0 ]
         });
     }
 }
@@ -1150,12 +1149,12 @@ function onCompositionDone( appRequest, appResponse ) {
         url = (config.server.siteurl + appRequest.params[ 0 ]),
         qrs = {};
 
-    cacheHtml = path.join( config.server.cacheroot, (reqSlug + ".html") );
-    cacheJson = path.join( config.server.cacheroot, (reqSlug + ".json") );
+    cacheHtml = path.join( config.server.cacheroot, ("page-" + reqSlug + ".html") );
+    cacheJson = path.join( config.server.cacheroot, ("page-" + reqSlug + ".json") );
 
     // JSON cache?
     if ( fs.existsSync( cacheJson ) ) {
-        cacheJson = functions.readJson( path.join( config.server.cacheroot, (reqSlug + ".json") ) );
+        cacheJson = functions.readJson( path.join( config.server.cacheroot, ("page-" + reqSlug + ".json") ) );
 
     } else {
         cacheJson = null;
@@ -1163,7 +1162,7 @@ function onCompositionDone( appRequest, appResponse ) {
 
     // HTML cache?
     if ( fs.existsSync( cacheHtml ) ) {
-        cacheHtml = functions.readFile( path.join( config.server.cacheroot, (reqSlug + ".html") ) );
+        cacheHtml = functions.readFile( path.join( config.server.cacheroot, ("page-" + reqSlug + ".html") ) );
 
     } else {
         cacheHtml = null;
@@ -1390,7 +1389,9 @@ function startServer() {
     // Regex to match Squarespace Headers
     rSQSHeadersFull = new RegExp([
         "<\\!-- This is Squarespace. --><\\!-- ",
-        config.name.toLowerCase(),
+
+        // This seems to be the format...
+        slug( config.name.toLowerCase() ),
         " -->(.*?)<\\!-- End of Squarespace Headers -->"
 
     ].join( "" ));
@@ -1404,7 +1405,7 @@ function startServer() {
     app.post( "/", onExpressRouterPOST );
     app.listen( app.get( "port" ) );
 
-    // Log that server is running
+    // Log that the server is running
     functions.log( ("Running @http://localhost:" + app.get( "port" )) );
 }
 
