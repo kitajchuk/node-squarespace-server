@@ -35,7 +35,7 @@ var _ = require( "underscore" ),
     rHeader = /header/,
     rFooter = /footer/,
     rAttrs = /(\w+)=("[^<>"]*"|'[^<>']*'|\w+)/g,
-    rScripts = /\<script\>(.*?)\<\/script\>/g,
+    rScripts = /\<script.*?\>(.*?)\<\/script\>/g,
     rIco = /\.ico$/,
     rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
     rBlockTags = /^\{\@\|apply\s|\}$/g,
@@ -47,6 +47,7 @@ var _ = require( "underscore" ),
     rLess = /\.less$/,
     rApi = /^\/api/,
     rDotIf = /\{\.if/g,
+    rJsonT = /^\{.*?\}$/,
 
     // Squarespace content
     rSQSQuery = /(\<squarespace:query.*?\>)(.*?)(\<\/squarespace:query\>)/,
@@ -311,16 +312,28 @@ function requestJsonAndHtml( url, qrs, callback ) {
  * @method requestQuery
  * @param {object} query Regex matched object
  * @param {object} qrs Querystring mapping
+ * @param {object} pageJson The page JSON
  * @param {function} callback Fired when done
  * @private
  *
  */
-function requestQuery( query, qrs, callback ) {
+function requestQuery( query, qrs, pageJson, callback ) {
     var data = functions.getAttrObj( query[ 1 ] ),
-        url = ( config.server.siteurl + "/" + data.collection + "/" ),
-        slg = ("query-" + data.collection),
-        qs = {};
-        qs.format = "json";
+        match = data.collection.match( rJsonT ),
+        qs = {},
+        url,
+        slg;
+
+    if ( match ) {
+        match = match[ 0 ];
+
+        data.collection = renderJsonTemplate( match, pageJson );
+    }
+
+    url = ( config.server.siteurl + "/" + data.collection + "/" );
+    slg = ("query-" + data.collection);
+
+    qs.format = "json";
 
     for ( var i in qrs ) {
         qs[ i ] = qrs[ i ];
@@ -516,7 +529,8 @@ function compileRegions( callback ) {
     for ( var i in config.layouts ) {
         files = config.layouts[ i ].regions;
         file = "";
-        link = (config.layouts[ i ].name.toLowerCase() + ".region");
+        //link = (config.layouts[ i ].name.toLowerCase() + ".region");
+        link = (i + ".region");
 
         for ( j = 0, len = files.length; j < len; j++ ) {
             file += functions.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) );
@@ -640,6 +654,7 @@ function replaceSQSScripts( callback ) {
 function compileStylesheets( callback ) {
     var reset = path.join( directories.styles, "reset.css" ),
         styles = "",
+        fpath,
         file;
 
     if ( fs.existsSync( reset ) ) {
@@ -647,7 +662,13 @@ function compileStylesheets( callback ) {
     }
 
     for ( var i = 0, len = config.stylesheets.length; i < len; i++ ) {
-        file = "" + fs.readFileSync( path.join( directories.styles, config.stylesheets[ i ] ) );
+        fpath = path.join( directories.styles, config.stylesheets[ i ] );
+
+        if ( !fs.existsSync( fpath ) ) {
+            continue;
+        }
+
+        file = "" + fs.readFileSync( fpath );
 
         if ( rLess.test( config.stylesheets[ i ] ) ) {
             less.render( file, function ( e, css ) {
@@ -745,7 +766,7 @@ function getTemplate( reqUri, pageJson ) {
 function replaceSQSTags( rendered, pageJson ) {
     rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
     rendered = rendered.replace( SQS_PAGE_CLASSES, "" );
-    rendered = rendered.replace( SQS_PAGE_ID, "" );
+    rendered = rendered.replace( new RegExp( SQS_PAGE_ID, "g" ), ("collection-" + pageJson.collection.id) );
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
 
     return rendered;
@@ -931,7 +952,10 @@ function replaceBlockFields( rendered, callback ) {
 
                     }, function ( error, response, json ) {
                         // cache block json
-                        functions.writeJson( blockPath, json );
+                        // check first, block could be "undefined"
+                        if ( json ) {
+                            functions.writeJson( blockPath, json );
+                        }
 
                         loopBlocks( block, attrs, json );
                     });
@@ -1105,7 +1129,7 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
         }
 
         if ( queries.length ) {
-            requestQuery( queries.shift(), qrs, handleQueried );
+            requestQuery( queries.shift(), qrs, pageJson, handleQueried );
 
         } else {
             handleDone();
@@ -1387,14 +1411,7 @@ function onExpressRouterPOST( appRequest, appResponse ) {
  */
 function startServer() {
     // Regex to match Squarespace Headers
-    rSQSHeadersFull = new RegExp([
-        "<\\!-- This is Squarespace. --><\\!-- ",
-
-        // This seems to be the format...
-        slug( config.name.toLowerCase() ),
-        " -->(.*?)<\\!-- End of Squarespace Headers -->"
-
-    ].join( "" ));
+    rSQSHeadersFull = new RegExp( "<\\!-- This is Squarespace. -->(.*?)<\\!-- End of Squarespace Headers -->" );
 
     // Create express application
     app.use( express.static( config.server.webroot ) );
