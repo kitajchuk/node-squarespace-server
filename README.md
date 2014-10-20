@@ -23,9 +23,24 @@ Navigate to your [Squarespace](http://squarespace.com) developer template and ad
 
 ```json
 "server": {
-    "siteurl": "https://yourite.squarespace.com",
-    "password": "sitewide password here if applicable"
+    "siteurl": "https://yoursite.squarespace.com"
 }
+```
+
+If you are using a site-wide password, then you would have the following:
+
+```json
+"server": {
+    "siteurl": "https://yoursite.squarespace.com",
+    "password: "yoursitewidepassword"
+}
+```
+
+And you will want to add this to your `.gitignore`:
+
+```shell
+# Ignore server cache
+.sqs-cache
 ```
 
 Once you have that, a simple:
