@@ -32,7 +32,7 @@ If you are using a site-wide password, then you would have the following:
 ```json
 "server": {
     "siteurl": "https://yoursite.squarespace.com",
-    "password: "yoursitewidepassword"
+    "password": "yoursitewidepassword"
 }
 ```
 
