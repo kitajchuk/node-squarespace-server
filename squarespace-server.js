@@ -706,7 +706,8 @@ function getTemplate( reqUri, pageJson ) {
         uriSegs = reqUri.replace( rSlash, "" ).split( "/" );
     }
 
-    regcheck = new RegExp( ("^" + uriSegs[ 0 ] + ".*?\\."), "i" );
+    // removed .*?
+    regcheck = new RegExp( (/* "^" +  */uriSegs[ 0 ] + "\\."), "i" );
 
     for ( var tpl in templates ) {
         if ( !rTplFiles.test( tpl ) ) {
