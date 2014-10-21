@@ -765,9 +765,12 @@ function getTemplate( reqUri, pageJson ) {
  *
  */
 function replaceSQSTags( rendered, pageJson ) {
+    var pageType = pageJson.item ? "item" : "collection",
+        pageId = pageJson.item ? pageJson.item.id : pageJson.collection.id;
+
     rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
     rendered = rendered.replace( SQS_PAGE_CLASSES, "" );
-    rendered = rendered.replace( new RegExp( SQS_PAGE_ID, "g" ), ("collection-" + pageJson.collection.id) );
+    rendered = rendered.replace( new RegExp( SQS_PAGE_ID, "g" ), (pageType + "-" + pageId) );
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
 
     return rendered;
