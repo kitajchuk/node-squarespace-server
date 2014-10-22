@@ -154,7 +154,10 @@ function loginPortal( callback ) {
         form: sqsUserData
 
     }, function ( error, response, json ) {
-        // errors...
+        if ( error ) {
+            functions.log( error );
+            return;
+        }
 
         // Request to TokenLogin
         request({
@@ -164,7 +167,10 @@ function loginPortal( callback ) {
             qs: sqsUserData
 
         }, function ( error, response, json ) {
-            // errors...
+            if ( error ) {
+                functions.log( error );
+                return;
+            }
 
             // Get the response cookie we need
             var cookie = response.headers[ "set-cookie" ].join( ";" );
@@ -337,18 +343,23 @@ function requestQuery( query, qrs, pageJson, callback ) {
 
     for ( var i in qrs ) {
         qs[ i ] = qrs[ i ];
+
+        // Skip password in unique cache
+        if ( i !== "format" && i !== "password" && i !== "nocache" ) {
+            slg += ("-" + i + "--" + qrs[ i ]);
+        }
     }
 
     // Tag?
     if ( data.tag ) {
         qs.tag = data.tag;
-        slg += "-" + data.tag;
+        slg += "-tag--" + data.tag;
     }
 
     // Category?
     if ( data.category ) {
         qs.category = data.category;
-        slg += "-" + data.category;
+        slg += "-category--" + data.category;
     }
 
     slg = path.join( config.server.cacheroot, (slg + ".json") );
@@ -371,6 +382,11 @@ function requestQuery( query, qrs, pageJson, callback ) {
             qs: qs
 
         }, function ( error, response, json ) {
+            if ( error ) {
+                functions.log( error );
+                return;
+            }
+
             functions.writeJson( slg, json );
 
             callback( query, data, json );
@@ -1172,17 +1188,35 @@ function compositionDone( callback ) {
 function onCompositionDone( appRequest, appResponse ) {
     var cacheHtml = null,
         cacheJson = null,
+        cacheName = null,
         slugged = slug( appRequest.params[ 0 ] ),
         reqSlug = ( slugged === "" ) ? homepage : slugged,
         url = (config.server.siteurl + appRequest.params[ 0 ]),
         qrs = {};
 
-    cacheHtml = path.join( config.server.cacheroot, ("page-" + reqSlug + ".html") );
-    cacheJson = path.join( config.server.cacheroot, ("page-" + reqSlug + ".json") );
+    cacheName = ("page-" + reqSlug);
+
+    // Password?
+    if ( config.server.password ) {
+        qrs.password = config.server.password;
+    }
+
+    // Querystring?
+    for ( i in appRequest.query ) {
+        qrs[ i ] = appRequest.query[ i ];
+
+        // Unique cache file name including queries
+        if ( i !== "format" && i !== "password" && i !== "nocache" ) {
+            cacheName += ("-" + i + "--" + qrs[ i ]);
+        }
+    }
+
+    cacheHtml = path.join( config.server.cacheroot, (cacheName + ".html") );
+    cacheJson = path.join( config.server.cacheroot, (cacheName + ".json") );
 
     // JSON cache?
     if ( fs.existsSync( cacheJson ) ) {
-        cacheJson = functions.readJson( path.join( config.server.cacheroot, ("page-" + reqSlug + ".json") ) );
+        cacheJson = functions.readJson( path.join( config.server.cacheroot, (cacheName + ".json") ) );
 
     } else {
         cacheJson = null;
@@ -1190,7 +1224,7 @@ function onCompositionDone( appRequest, appResponse ) {
 
     // HTML cache?
     if ( fs.existsSync( cacheHtml ) ) {
-        cacheHtml = functions.readFile( path.join( config.server.cacheroot, ("page-" + reqSlug + ".html") ) );
+        cacheHtml = functions.readFile( path.join( config.server.cacheroot, (cacheName + ".html") ) );
 
     } else {
         cacheHtml = null;
@@ -1202,16 +1236,6 @@ function onCompositionDone( appRequest, appResponse ) {
         cacheHtml = null;
 
         functions.log( "Clearing request cache" );
-    }
-
-    // Password?
-    if ( config.server.password ) {
-        qrs.password = config.server.password;
-    }
-
-    // Querystring?
-    for ( i in appRequest.query ) {
-        qrs[ i ] = appRequest.query[ i ];
     }
 
     // Cache?
@@ -1234,7 +1258,7 @@ function onCompositionDone( appRequest, appResponse ) {
 
         } else {
             requestJson( url, qrs, function ( json ) {
-                functions.writeJson( path.join( config.server.cacheroot, (reqSlug + ".json") ), json );
+                functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), json );
 
                 appResponse.status( 200 ).json( json );
             });
@@ -1243,8 +1267,8 @@ function onCompositionDone( appRequest, appResponse ) {
     // Request page?
     } else {
         requestJsonAndHtml( url, qrs, function ( data ) {
-            functions.writeJson( path.join( config.server.cacheroot, ("page-" + reqSlug + ".json") ), data.json );
-            functions.writeFile( path.join( config.server.cacheroot, ("page-" + reqSlug + ".html") ), functions.squashHtml( data.html ) );
+            functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json );
+            functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashHtml( data.html ) );
 
             renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
@@ -1262,35 +1286,57 @@ function onCompositionDone( appRequest, appResponse ) {
  *
  */
 function processArguments( args ) {
-    var data = functions.readJson( path.join( __dirname, "package.json" ) );
+    var data = functions.readJson( path.join( __dirname, "package.json" ) ),
+        flags = {},
+        commands = {};
 
     if ( !args || !args.length ) {
         console.log( "Squarespace Server" );
         console.log( "Version " + data.version );
         console.log();
+        console.log( "Commands:" );
+        console.log( "sqs buster       Delete local site cache" );
+        console.log( "sqs server       Start the local server" );
+        console.log();
         console.log( "Options:" );
         console.log( "sqs --version    Print package version" );
-        console.log( "sqs --buster     Delete local site cache" );
-        console.log( "sqs --server     Start the local server" );
+        console.log( "sqs --port=XXXX  Use the specified port" );
+        console.log();
+        console.log( "Examples:" );
+        console.log( "sqs server --port=8000" );
         process.exit();
     }
 
     _.each( args, function ( arg ) {
-        switch ( arg ) {
-            case "--version":
-                functions.log( data.version );
-                process.exit();
-            break;
-            case "--buster":
-                fse.removeSync( path.join( config.server.cacheroot ) );
-                functions.log( "Trashed your local .sqs-cache." );
-                process.exit();
-            break;
-            case "--server":
-                startServer();
-            break;
+        var rFlag = /^--/,
+            split;
+
+        if ( rFlag.test( arg ) ) {
+            split = arg.split( "=" );
+            flags[ split[ 0 ].replace( rFlag, "" ) ] = (split[ 1 ] || undefined);
+
+        } else {
+            commands[ arg ] = true;
         }
     });
+
+    // Order of operations
+    if ( flags.version ) {
+        functions.log( data.version );
+        process.exit();
+
+    } else if ( commands.buster ) {
+        fse.removeSync( path.join( config.server.cacheroot ) );
+        functions.log( "Trashed your local .sqs-cache." );
+        process.exit();
+
+    } else if ( commands.server ) {
+        if ( flags.port ) {
+            config.server.port = flags.port;
+        }
+
+        startServer();
+    }
 }
 
 
