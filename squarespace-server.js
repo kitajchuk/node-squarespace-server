@@ -723,34 +723,47 @@ function getTemplate( reqUri, pageJson ) {
     }
 
     // removed .*?
-    regcheck = new RegExp( (/* "^" +  */uriSegs[ 0 ] + "\\."), "i" );
+    regcheck = new RegExp( (uriSegs[ 0 ] + "\\."), "i" );
 
     for ( var tpl in templates ) {
         if ( !rTplFiles.test( tpl ) ) {
             continue;
         }
 
-        // 0 => Multiple URIs some/fresh/page
-        // 1 => Regular Expression tests out
-        // 2 => Filename tests out as a .item file
-        if ( uriSegs.length > 1 && regcheck.test( tpl ) && rItem.test( tpl ) ) {
-            template = tpl;
-            break;
-        }
+        // Homepage is special
+        if ( pageJson.collection.homepage ) {
+            // It is of type page, use region below
+            if ( pageJson.collection.typeName === "page" ) {
+                break;
 
-        // 0 => A Single URI page
-        // 1 => Regular Expression tests out
-        // 2 => Filename tests out as a .list file
-        if ( uriSegs.length === 1 && regcheck.test( tpl ) && rList.test( tpl ) ) {
-            template = tpl;
-            break;
-        }
+            } else if ( fs.existsSync( path.join( directories.collections, (pageJson.collection.typeName + ".list") ) ) ) {
+                template = (pageJson.collection.typeName + ".list");
+                break;
+            }
 
-        // 1 => Regular Expression tests out
-        // 2 => Filename tests out as a .region file
-        if ( regcheck.test( tpl ) && rRegions.test( tpl ) ) {
-            template = tpl;
-            break;
+        } else {
+            // 0 => Multiple URIs some/fresh/page
+            // 1 => Regular Expression tests out
+            // 2 => Filename tests out as a .item file
+            if ( uriSegs.length > 1 && regcheck.test( tpl ) && rItem.test( tpl ) ) {
+                template = tpl;
+                break;
+            }
+
+            // 0 => A Single URI page
+            // 1 => Regular Expression tests out
+            // 2 => Filename tests out as a .list file
+            if ( uriSegs.length === 1 && regcheck.test( tpl ) && rList.test( tpl ) ) {
+                template = tpl;
+                break;
+            }
+
+            // 1 => Regular Expression tests out
+            // 2 => Filename tests out as a .region file
+            if ( regcheck.test( tpl ) && rRegions.test( tpl ) ) {
+                template = tpl;
+                break;
+            }
         }
     }
 
