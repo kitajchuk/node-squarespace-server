@@ -62,7 +62,22 @@ sqs server --port=8000
 sqs buster
 ```
 
-This runs the [express](http://expressjs.com) server on port `5050` for `localhost`. You will first be prompted with a login page. Enter your email and password for YOUR Squarespace account ( used for logging into /config ) that is associated with THIS Squarespace site. This information is not stored anywhere, it is just used to make some initial requests to retrieve data for your site.
+This runs the [express](http://expressjs.com) server on port `5050` at `localhost`.
+
+
+
+## Login
+You will first be prompted with a login page. Enter your email and password for YOUR Squarespace account ( used for logging into `/config` ) that is associated with THIS Squarespace site. This information is not stored anywhere, it is just used to make some initial requests to retrieve data for your site.
+
+
+
+## Logout
+Logging out is easy. Stopping the server will log you out if you are working locally. If you are running the instance on a deployed server, you can always hit `/logout` to logout. You will automatically be logged out after a period of 24 hours.
+
+
+
+## Deploy
+All testing of this module has been done locally. Once testing is completed for running this on a deployed server expect the steps to be listed here.
 
 
 

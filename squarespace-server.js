@@ -91,6 +91,10 @@ var _ = require( "underscore" ),
     // Squarespace login required
     sqsUserData = null,
 
+    // 24 hours
+    sqsTimeOfLogin = null,
+    sqsTimeLoggedIn = 86400000,
+
     // Squarespace uses /homepage
     homepage = "homepage",
 
@@ -372,7 +376,7 @@ function requestQuery( query, qrs, pageJson, callback ) {
 
     } else {
         if ( qrs.nocache !== undefined ) {
-            functions.log( "Clearing query cache" );
+            functions.log( "Clearing query cache: ", data.collection );
         }
 
         request({
@@ -730,12 +734,13 @@ function getTemplate( reqUri, pageJson ) {
             continue;
         }
 
-        // Homepage is special
+        // Homepage => This is a special case
         if ( pageJson.collection.homepage ) {
-            // It is of type page, use region below
+            // It is of type page, break and use region below
             if ( pageJson.collection.typeName === "page" ) {
                 break;
 
+            // It is a collection and a .list of its type is located
             } else if ( fs.existsSync( path.join( directories.collections, (pageJson.collection.typeName + ".list") ) ) ) {
                 template = (pageJson.collection.typeName + ".list");
                 break;
@@ -1386,11 +1391,31 @@ function onExpressRouterGET( appRequest, appResponse ) {
         functions.log( "GET - " + appRequest.params[ 0 ] );
     }
 
+    // Logout
+    if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "logout" ) {
+        functions.log( "AUTH - Logout of Squarespace!" );
+
+        sqsUserData = null;
+
+        appResponse.redirect( "/" );
+
+        return;
+    }
+
     // Authenticated
     if ( !sqsUserData ) {
         functions.log( "AUTH - Login to Squarespace!" );
 
         appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
+
+        return;
+    }
+
+    // Login expires
+    if ( (Date.now() - sqsTimeOfLogin) >= sqsTimeLoggedIn ) {
+        functions.log( "AUTH EXPIRED - Logout of Squarespace!" );
+
+        appResponse.redirect( "/logout" );
 
         return;
     }
@@ -1448,6 +1473,8 @@ function onExpressRouterPOST( appRequest, appResponse ) {
                 // All done, load the site
                 if ( !apis.length ) {
                     config.server.siteData.collections = json;
+
+                    sqsTimeOfLogin = Date.now();
 
                     appResponse.json({
                         success: true
