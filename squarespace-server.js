@@ -673,12 +673,13 @@ function replaceSQSScripts( callback ) {
  */
 function compileStylesheets( callback ) {
     var reset = path.join( directories.styles, "reset.css" ),
-        styles = "",
+        lessCss = "",
+        pureCss = "",
         fpath,
         file;
 
     if ( fs.existsSync( reset ) ) {
-        styles += functions.readFile( reset );
+        pureCss += functions.readFile( reset );
     }
 
     for ( var i = 0, len = config.stylesheets.length; i < len; i++ ) {
@@ -688,19 +689,21 @@ function compileStylesheets( callback ) {
             continue;
         }
 
-        file = "" + fs.readFileSync( fpath );
+        file = ("" + fs.readFileSync( fpath ));
 
         if ( rLess.test( config.stylesheets[ i ] ) ) {
-            less.render( file, function ( e, css ) {
-                styles += css;
-            });
+            lessCss += file;
 
         } else {
-            styles += file;
+            pureCss += file;
         }
     }
 
-    siteCss = uglifycss.processString( styles );
+    less.render( lessCss, function ( error, css ) {
+        lessCss = css;
+    });
+
+    siteCss = uglifycss.processString( (pureCss + lessCss) );
 
     return callback;
 }
@@ -1052,6 +1055,9 @@ function setHeaderFooterTokens( pageJson, pageHtml ) {
 
     // Headers?
     if ( sHeadersFull ) {
+        //"/*! Squarespace LESS Compiler"
+        //"/*! Developer Styles */"
+        
         sHeadersFull = sHeadersFull[ 0 ];
         //sSiteCssMatch = sHeadersFull[ 0 ].match( rSiteCssReplace );
         siteStyleTag = '<!-- ' + config.name + ' Local Styles --><style type="text/css">' + siteCss + '</style>';
