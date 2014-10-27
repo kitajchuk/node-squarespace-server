@@ -16,6 +16,17 @@ cd node-squarespace-server
 npm install -g .
 ```
 
+### Updaing
+For now you will do this manually:
+
+```shell
+# cd to node-squarespace-server directory
+
+git pull origin master
+
+npm install . -g
+```
+
 
 
 ## Usage
