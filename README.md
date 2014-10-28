@@ -16,7 +16,7 @@ cd node-squarespace-server
 npm install -g .
 ```
 
-### Updaing
+### Updating
 For now you will do this manually:
 
 ```shell
