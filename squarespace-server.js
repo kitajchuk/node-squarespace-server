@@ -721,6 +721,12 @@ function getTemplate( reqUri, pageJson ) {
         uriSegs = null,
         regcheck = null;
 
+    if ( !pageJson ) {
+        functions.log( "TEMPLATE - Page JSON UNDEFINED" );
+
+        return;
+    }
+
     if ( reqUri === "/" ) {
         uriSegs = [homepage];
 
