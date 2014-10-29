@@ -403,12 +403,11 @@ function requestQuery( query, qrs, pageJson, callback ) {
  *
  * config.server = {
  *      siteurl,
- *      webroot,
- *      cacheroot,
  *      port,
- *      password
- *      secureauth,
+ *      webroot,
+ *      protocol,
  *      siteData
+ *      cacheroot
  * };
  *
  * @method setServerConfig
