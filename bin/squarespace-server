@@ -1,12 +1,32 @@
 #!/usr/bin/env node
 
 var fs = require( "fs" ),
+    forever = require( "forever-monitor" ),
     cwd = process.cwd(),
     args = [].slice.call( process.argv, 2 ),
     path = require( "path" ),
-    server = require( "../squarespace-server" ),
+    functions = require( "../lib/functions" ),
+    server = null,
+    config = null;
+
+if ( args.indexOf( "--forever" ) !== -1 ) {
+    args.splice( args.indexOf( "--forever" ), 1 );
+    args.unshift( "sqs" );
+
+    functions.log( "Started server with forever-monitor" );
+
+    forever.start( args, {
+        max: 1,
+        silent: false,
+        killTree: true
+    });
+
+} else {
+    server = require( "../squarespace-server" );
+
     config = path.join( cwd, "template.conf" );
     config = ("" + fs.readFileSync( config ));
     config = JSON.parse( config );
 
-server.init( config, args );
+    server.init( config, args );
+}

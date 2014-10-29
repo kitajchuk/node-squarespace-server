@@ -66,6 +66,9 @@ sqs --version
 # Run the server
 sqs server
 
+# Run the server with forever-monitor
+sqs server --forever
+
 # Run the server on a specific port
 sqs server --port=8000
 
