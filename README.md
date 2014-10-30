@@ -16,7 +16,7 @@ cd node-squarespace-server
 npm install -g .
 ```
 
-### Updating
+#### Updating
 For now you will do this manually:
 
 ```shell
@@ -66,7 +66,7 @@ sqs --version
 # Run the server
 sqs server
 
-# Run the server with forever-monitor
+# Run the server with forever
 sqs server --forever
 
 # Run the server on a specific port
@@ -76,7 +76,12 @@ sqs server --port=8000
 sqs buster
 ```
 
-This runs the [express](http://expressjs.com) server on port `5050` at `localhost`.
+This runs the [express](http://expressjs.com) server on the relevant port. The default is `localhost:5050`.
+
+
+
+## Workflow
+You can use any front-end workflow you like when working with a custom Squarespace template. At the very least the separation of your source files and your actual template is recommended. I have developed a [grunt](http://gruntjs.com) workflow that bootstraps a [grunt-nautilus](https://github.com/kitajchuk/grunt-nautilus) based approach: [grunt-init-squarespace](https://github.com/kitajchuk/grunt-init-squarespace). At the very least, this is a good example of how to go about setting up your own workflow which keeps your source and template code separate.
 
 
 
