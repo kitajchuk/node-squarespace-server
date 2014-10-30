@@ -1,30 +1,29 @@
 #!/usr/bin/env node
 
 var fs = require( "fs" ),
-    forever = require( "forever-monitor" ),
     cwd = process.cwd(),
     args = [].slice.call( process.argv, 2 ),
     path = require( "path" ),
+    exec = require( "exec" ),
+    server = require( "../squarespace-server" ), 
+    config = path.join( cwd, "template.conf" ),
+    forever = path.join( __dirname, "../", "node_modules", "forever", "bin", "forever" ),
+    startup = path.join( __dirname, "../squarespace-startup.js" )
     functions = require( "../lib/functions" ),
-    server = null,
-    config = null;
+    foreverIdx = args.indexOf( "--forever" );
 
-if ( args.indexOf( "--forever" ) !== -1 ) {
-    args.splice( args.indexOf( "--forever" ), 1 );
-    args.unshift( "sqs" );
+// Start with forever process
+if ( foreverIdx !== -1 ) {
+    functions.log( (forever + " start " + startup + " " + args.join( " " )) );
 
-    functions.log( "Started server with forever-monitor" );
+    // Splice --forever flag from the argument list
+    args.splice( foreverIdx, 1 );
 
-    forever.start( args, {
-        max: 1,
-        silent: false,
-        killTree: true
-    });
+    // @todo: Utilize --uid in order to support sqs stop-server or something like that
+    exec( (forever + " start " + startup + " " + args.join( " " ) + " --uid 'node-squarespace-server'"), function ( error, stdout ) {} );
 
+// Standard node process
 } else {
-    server = require( "../squarespace-server" );
-
-    config = path.join( cwd, "template.conf" );
     config = ("" + fs.readFileSync( config ));
     config = JSON.parse( config );
 
