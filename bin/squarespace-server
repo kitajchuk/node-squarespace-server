@@ -14,7 +14,7 @@ var fs = require( "fs" ),
 
 // Start with forever process
 if ( foreverIdx !== -1 ) {
-    functions.log( (forever + " start " + startup + " " + args.join( " " )) );
+    functions.log( "Started server with forever" );
 
     // Splice --forever flag from the argument list
     args.splice( foreverIdx, 1 );
