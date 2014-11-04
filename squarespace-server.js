@@ -159,7 +159,7 @@ function loginPortal( callback ) {
 
     }, function ( error, response, json ) {
         if ( error ) {
-            functions.log( error );
+            functions.log( "ERROR - " + error );
             return;
         }
 
@@ -172,7 +172,7 @@ function loginPortal( callback ) {
 
         }, function ( error, response, json ) {
             if ( error ) {
-                functions.log( error );
+                functions.log( "ERROR - " + error );
                 return;
             }
 
@@ -250,7 +250,7 @@ function requestHtml( url, qrs, callback ) {
 
     }, function ( error, response, html ) {
         if ( error ) {
-            functions.log( error );
+            functions.log( "ERROR - " + error );
             return;
         }
 
@@ -284,7 +284,7 @@ function requestJson( url, qrs, callback ) {
 
     }, function ( error, response, json ) {
         if ( error ) {
-            functions.log( error );
+            functions.log( "ERROR - " + error );
             return;
         }
 
@@ -370,13 +370,13 @@ function requestQuery( query, qrs, pageJson, callback ) {
 
     // Cached?
     if ( fs.existsSync( slg ) && qrs.nocache === undefined ) {
-        functions.log( "Loading query from cache" );
+        functions.log( "CACHE - Loading cached query" );
 
         callback( query, data, functions.readJson( slg ) );
 
     } else {
         if ( qrs.nocache !== undefined ) {
-            functions.log( "Clearing query cache: ", data.collection );
+            functions.log( "CACHE - Clearing cached query: ", data.collection );
         }
 
         request({
@@ -387,7 +387,7 @@ function requestQuery( query, qrs, pageJson, callback ) {
 
         }, function ( error, response, json ) {
             if ( error ) {
-                functions.log( error );
+                functions.log( "ERROR - " + error );
                 return;
             }
 
@@ -787,7 +787,7 @@ function getTemplate( reqUri, pageJson ) {
 
     // 0 => Template still didn't match up, fail...
     if ( !template ) {
-        functions.log( "Template not matched - " + template );
+        functions.log( "TEMPLATE - Not matched:", template );
 
     } else {
         functions.log( "TEMPLATE - " + template );
@@ -1392,15 +1392,20 @@ function onExpressRouterGET( appRequest, appResponse ) {
         );
 
     // Exit clause...
+    // Maybe just do a redirect here?
     if ( rIco.test( appRequest.params[ 0 ] ) || rApi.test( appRequest.params[ 0 ] ) ) {
-        functions.log( "URL - " + appRequest.params[ 0 ] + " Not trying it" );
-
-        appResponse.end();
+        appResponse.redirect( (config.server.siteurl + appRequest.params[ 0 ]) );
 
         return;
+    }
 
-    } else {
-        functions.log( "GET - " + appRequest.params[ 0 ] );
+    // Config
+    if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "config" ) {
+        functions.log( "CONFIG - Author your content!" );
+
+        appResponse.redirect( (config.server.siteurl + "/config/") );
+
+        return;
     }
 
     // Logout
@@ -1414,7 +1419,7 @@ function onExpressRouterGET( appRequest, appResponse ) {
         return;
     }
 
-    // Authenticated
+    // Authentication
     if ( !sqsUserData ) {
         functions.log( "AUTH - Login to Squarespace!" );
 
@@ -1423,7 +1428,7 @@ function onExpressRouterGET( appRequest, appResponse ) {
         return;
     }
 
-    // Login expires
+    // Login expired
     if ( (Date.now() - sqsTimeOfLogin) >= sqsTimeLoggedIn ) {
         functions.log( "AUTH EXPIRED - Logout of Squarespace!" );
 
@@ -1431,6 +1436,9 @@ function onExpressRouterGET( appRequest, appResponse ) {
 
         return;
     }
+
+    // Log URI
+    functions.log( "GET - " + appRequest.params[ 0 ] );
 
     // Compose public server
     compose(function () {
@@ -1458,7 +1466,7 @@ function onExpressRouterPOST( appRequest, appResponse ) {
         ];
 
     if ( !data.email || !data.password ) {
-        functions.log( "Email AND Password required." );
+        functions.log( "AUTH - Email AND Password required." );
 
         appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
 
