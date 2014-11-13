@@ -5,8 +5,12 @@ node-squarespace-server
 
 
 
+## Usage
+This is not published to [npm](http://npmjs.org) yet, there is a [milestone](https://github.com/kitajchuk/node-squarespace-server/milestones/NPM%20Published) for that. It works well in its current state as a beta program so I would still encourage its use. Log issues that you find or just hit me up about any notes or insights you have for it.
+
+
 ## Installation
-This is NOT finished. I recommend watching this repo if you would like to use it when it is ready. But, if you're interested, carry on. This is not yet published to [npm](http://npmjs.org), so your setup is as follows:
+For now, you will do this manually:
 
 ```shell
 git clone git@github.com:kitajchuk/node-squarespace-server.git
@@ -20,7 +24,7 @@ npm install -g .
 For now you will do this manually:
 
 ```shell
-# cd to node-squarespace-server directory
+# cd to node-squarespace-server directory, wherever you cloned it to...
 
 git pull origin master
 
