@@ -522,7 +522,9 @@ function compileCollections( callback ) {
             files = [header, file, footer];
 
             for ( var j = 0, len = files.length; j < len; j++ ) {
-                content += functions.readFile( files[ j ] );
+                if ( fs.existsSync( files[ j ] ) ) {
+                    content += functions.readFile( files[ j ] );
+                }
             }
 
             templates[ collections[ i ] ] = content;
