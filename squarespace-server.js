@@ -91,6 +91,9 @@ var _ = require( "underscore" ),
     // Squarespace login required
     sqsUserData = null,
 
+    // Squarespace login headers
+    sqsResHeaders = null,
+
     // 24 hours
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
@@ -229,7 +232,7 @@ function getHeaders( headers ) {
         ret = _.extend( ret, headers );
     }
 
-    return ret;
+    return ( sqsResHeaders ) ? sqsResHeaders : ret;
 }
 
 
@@ -550,7 +553,6 @@ function compileRegions( callback ) {
     for ( var i in config.layouts ) {
         files = config.layouts[ i ].regions;
         file = "";
-        //link = (config.layouts[ i ].name.toLowerCase() + ".region");
         link = (i + ".region");
 
         for ( j = 0, len = files.length; j < len; j++ ) {
@@ -747,7 +749,8 @@ function getTemplate( reqUri, pageJson ) {
         // Homepage => This is a special case
         if ( pageJson.collection.homepage ) {
             // It is of type page, break and use region below
-            if ( pageJson.collection.typeName === "page" ) {
+            if ( pageJson.collection.typeName === "page" && pageJson.collection.regionName ) {
+                template = (pageJson.collection.regionName + ".region");
                 break;
 
             // It is a collection and a .list of its type is located
@@ -784,7 +787,7 @@ function getTemplate( reqUri, pageJson ) {
 
     // 0 => Template not matched above, try page JSON
     if ( !template ) {
-        template = (pageJson.collection.regionName + ".region");
+        template = "default.region";
     }
 
     // 0 => Template still didn't match up, fail...
@@ -1103,10 +1106,20 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
     var queries = [],
         template = null,
         rendered = null,
-        matched = null;
+        matched = null,
+        region;
 
     // Template?
     template = getTemplate( reqUri, pageJson );
+
+    // 0.1 => Template is a list or item for a collection
+    // 0.2 => The global header and footer vars are null set
+    // When not using header or footer region partials, we inject the content into the right layout
+    if ( rItemOrList.test( template ) && !header && !footer ) {
+        region = ( pageJson.collection.regionName ) ? ( pageJson.collection.regionName + ".region") : "default.region";
+        templates[ template ] = templates[ region ].replace( SQS_MAIN_CONTENT, templates[ template ] );
+        console.log( "rendering template by layout injection" );
+    }
 
     // Html?
     rendered = templates[ template ];
@@ -1478,6 +1491,8 @@ function onExpressRouterPOST( appRequest, appResponse ) {
     sqsUserData = data;
 
     loginPortal(function ( headers ) {
+        sqsResHeaders = headers;
+
         // Fetch site API data
         function getAPI() {
             var api = apis.shift(),
