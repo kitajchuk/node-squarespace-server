@@ -1,8 +1,7 @@
 node-squarespace-server
 =======================
 
-> A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com).
-
+> A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com). **Note: This currently isn't working with sandbox accounts in trial mode**.
 
 
 ## Usage
