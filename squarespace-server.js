@@ -1118,7 +1118,6 @@ function renderTemplate( reqUri, qrs, pageJson, pageHtml, callback ) {
     if ( rItemOrList.test( template ) && !header && !footer ) {
         region = ( pageJson.collection.regionName ) ? ( pageJson.collection.regionName + ".region") : "default.region";
         templates[ template ] = templates[ region ].replace( SQS_MAIN_CONTENT, templates[ template ] );
-        console.log( "rendering template by layout injection" );
     }
 
     // Html?
