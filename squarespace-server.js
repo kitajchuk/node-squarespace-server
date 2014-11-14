@@ -232,7 +232,7 @@ function getHeaders( headers ) {
         ret = _.extend( ret, headers );
     }
 
-    return ( sqsResHeaders ) ? sqsResHeaders : ret;
+    return ret;
 }
 
 
