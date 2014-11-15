@@ -53,27 +53,6 @@ setUser = function ( user ) {
 
 /**
  *
- * @method getHeaders
- * @param {object} headers Merge object with required headers
- * @returns {object}
- * @private
- *
- */
-getHeaders = function ( headers ) {
-    var ret = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36"
-    };
-
-    if ( headers ) {
-        ret = _.extend( ret, headers );
-    }
-
-    return ret;
-},
-
-
-/**
- *
  * @method loginPortal
  * @param {function} callback Fired when login and headers are set
  * @public
@@ -335,6 +314,31 @@ requestQuery = function ( query, qrs, pageJson, callback ) {
             callback( query, data, json );
         });
     }
+},
+
+
+/******************************************************************************
+ * @Private
+*******************************************************************************/
+
+/**
+ *
+ * @method getHeaders
+ * @param {object} headers Merge object with required headers
+ * @returns {object}
+ * @private
+ *
+ */
+getHeaders = function ( headers ) {
+    var ret = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36"
+    };
+
+    if ( headers ) {
+        ret = _.extend( ret, headers );
+    }
+
+    return ret;
 };
 
 
