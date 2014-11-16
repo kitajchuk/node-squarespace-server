@@ -19,7 +19,7 @@ var request = require( "request" ),
     rScripts = /<script.*?\>(.*?)<\/script\>/g,
     rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
     rBlockTags = /^\{\@\|apply\s|\}$/g,
-    rTplFiles = /\.item$|\.list$|\.region$/,
+    rTplFiles = /\.item$|\.list$|\.region$|__HEADER$|__FOOTER$/,
     rItemOrList = /\.item$|\.list$/,
     rRegions = /\.region$/,
     rItem = /\.item$/,
@@ -46,8 +46,6 @@ var request = require( "request" ),
     config = null,
     scripts = [],
     siteCss = null,
-    header = null,
-    footer = null,
     templates = {},
 
 
@@ -121,23 +119,15 @@ replaceSQSTags = function ( rendered, pageJson ) {
  */
 compileCollections = function () {
     var collections = fs.readdirSync( directories.collections ),
-        content = null,
-        file = null,
-        files = null;
+        file = null;
 
     for ( var i = collections.length; i--; ) {
         if ( rItemOrList.test( collections[ i ] ) ) {
-            content = "";
             file = path.join( directories.collections, collections[ i ] );
-            files = [header, file, footer];
 
-            for ( var j = 0, len = files.length; j < len; j++ ) {
-                if ( fs.existsSync( files[ j ] ) ) {
-                    content += functions.readFile( files[ j ] );
-                }
+            if ( fs.existsSync( file ) ) {
+                templates[ collections[ i ] ] = functions.readFile( file );
             }
-
-            templates[ collections[ i ] ] = content;
         }
     }
 },
@@ -160,7 +150,12 @@ compileRegions = function () {
         link = (i + ".region");
 
         for ( j = 0, len = files.length; j < len; j++ ) {
-            file += functions.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) );
+            // Skip header / footer regions since we parsed them earlier
+            // templates.__HEADER
+            // templates.__FOOTER
+            if ( !rHeader.test( files[ j ] ) && !rFooter.test( files[ j ] ) ) {
+                file += functions.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) );
+            }
         }
 
         templates[ link ] = file;
@@ -262,20 +257,20 @@ replaceSQSScripts = function () {
 
 /**
  *
- * @method getTemplate
+ * @method getTemplateKey
  * @param {string} reqUri URI seg zero
  * @param {object} pageJson JSON data for page
  * @public
  *
  */
-getTemplate = function ( reqUri, pageJson ) {
+getTemplateKey = function ( reqUri, pageJson ) {
     var template = null,
         uriSegs = null,
         regcheck = null;
 
+    // This could happen, I suppose...
     if ( !pageJson ) {
         functions.log( "TEMPLATE - Page JSON UNDEFINED" );
-
         return;
     }
 
@@ -286,7 +281,7 @@ getTemplate = function ( reqUri, pageJson ) {
         uriSegs = reqUri.replace( rSlash, "" ).split( "/" );
     }
 
-    // removed .*?
+    // This seems to be working for now
     regcheck = new RegExp( (uriSegs[ 0 ] + "\\."), "i" );
 
     for ( var tpl in templates ) {
@@ -333,20 +328,14 @@ getTemplate = function ( reqUri, pageJson ) {
         }
     }
 
-    // 0 => Template not matched above, try page JSON
+    // 0 => Template not matched above, use default
     if ( !template ) {
         template = "default.region";
     }
 
-    // 0 => Template still didn't match up, fail...
-    if ( !template ) {
-        functions.log( "TEMPLATE - Not matched:", template );
+    functions.log( "TEMPLATE - " + template );
 
-    } else {
-        functions.log( "TEMPLATE - " + template );
-
-        return template;
-    }
+    return template;
 },
 
 
@@ -363,24 +352,30 @@ getTemplate = function ( reqUri, pageJson ) {
  */
 renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
     var queries = [],
-        template = null,
-        rendered = null,
+        templateKey = getTemplateKey( reqUri, pageJson ),
+        rendered = "",
         matched = null,
-        region;
+        regionKey;
 
-    // Template?
-    template = getTemplate( reqUri, pageJson );
-
-    // 0.1 => Template is a list or item for a collection
-    // 0.2 => The global header and footer vars are null set
-    // When not using header or footer region partials, we inject the content into the right layout
-    if ( rItemOrList.test( template ) && !header && !footer ) {
-        region = ( pageJson.collection.regionName ) ? ( pageJson.collection.regionName + ".region") : "default.region";
-        templates[ template ] = templates[ region ].replace( SQS_MAIN_CONTENT, templates[ template ] );
+    if ( templates.__HEADER ) {
+        rendered += templates.__HEADER;
     }
 
-    // Html?
-    rendered = templates[ template ];
+    // 0.1 => Template is a list or item for a collection, NOT a region
+    // What we are doing here is replicating the injection point for {squarespace.main-content} on collections
+    if ( rItemOrList.test( templateKey ) ) {
+        regionKey = ((pageJson.collection.regionName || "default") + ".region");
+
+        // This wraps the matched collection template with the default or set region
+        rendered += templates[ regionKey ].replace( SQS_MAIN_CONTENT, templates[ templateKey ] );
+
+    } else {
+        rendered += templates[ templateKey ];
+    }
+
+    if ( templates.__FOOTER ) {
+        rendered += templates.__FOOTER;
+    }
 
     // SQS Tags?
     rendered = replaceSQSTags( rendered, pageJson );
@@ -535,10 +530,10 @@ setHeaderFooter = function () {
 
     for ( i = files.length; i--; ) {
         if ( rRegions.test( files[ i ] ) && rHeader.test( files[ i ] ) ) {
-            header = path.join( config.server.webroot, files[ i ] );
+            templates.__HEADER = functions.readFile( path.join( config.server.webroot, files[ i ] ) );
 
         } else if ( rRegions.test( files[ i ] ) && rFooter.test( files[ i ] ) ) {
-            footer = path.join( config.server.webroot, files[ i ] );
+            templates.__FOOTER = functions.readFile( path.join( config.server.webroot, files[ i ] ) );
         }
     }
 },
@@ -842,7 +837,7 @@ module.exports = {
     replaceBlocks: replaceBlocks,
     replaceScripts: replaceScripts,
     replaceSQSScripts: replaceSQSScripts,
-    getTemplate: getTemplate,
+    getTemplateKey: getTemplateKey,
     renderTemplate: renderTemplate,
     compileStylesheets: compileStylesheets,
     setSQSHeadersFooters: setSQSHeadersFooters,
