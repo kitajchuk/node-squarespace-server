@@ -1,4 +1,8 @@
-// Executable startup javascript file...
+/*!
+ *
+ * Squarespace executable startup javascript file...
+ *
+ */
 var fs = require( "fs" ),
     cwd = process.cwd(),
     path = require( "path" ),
