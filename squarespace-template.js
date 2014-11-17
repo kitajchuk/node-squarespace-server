@@ -290,7 +290,7 @@ getTemplateKey = function ( reqUri, pageJson ) {
         }
 
         // Homepage => This is a special case
-        if ( pageJson.collection.homepage ) {
+        if ( pageJson.collection.homepage && uriSegs.length === 1 ) {
             // It is of type page, break and use region below
             if ( pageJson.collection.typeName === "page" && pageJson.collection.regionName ) {
                 template = (pageJson.collection.regionName + ".region");
