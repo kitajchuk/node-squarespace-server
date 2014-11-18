@@ -8,7 +8,29 @@ var jsonTemplate = require( "./lib/jsontemplate" ),
         more_formatters: require( "./lib/formatters" ),
         more_predicates: require( "./lib/predicates" ),
         undefined_str: ""
-    };
+    },
+    issueIfBlocks = [
+        "categories",
+        "categoryFilter"
+    ],
+
+
+/******************************************************************************
+ * @Private
+*******************************************************************************/
+
+replaceIssueIfBlocks = function ( render ) {
+    var match;
+
+    for ( var i = issueIfBlocks.length; i--; ) {
+        while ( match = render.match( new RegExp( "{\\.if\s" + issueIfBlocks[ i ] + "}" ) ) ) {
+            render = render.replace( match[ 0 ], "{.section " + issueIfBlocks[ i ] + "}" );
+            render = render.replace( new RegExp( "{\\.repeated section " + issueIfBlocks[ i ] + "}" ), "{.repeated section @}" );
+        }
+    }
+
+    return render;
+},
 
 
 /******************************************************************************
@@ -24,22 +46,17 @@ var jsonTemplate = require( "./lib/jsontemplate" ),
  * @public
  *
  */
-function renderJsonTemplate( render, data ) {
-    // TEMPORARY SOLUTION!
-    // Formalize .if to .section and avoid json-template blowing up
-    // This fixes issues with nested .repeated sections within a .if
-    var match;
-
-    while ( match = render.match( /\{\.if\s(.*?)\}/ ) ) {
-        render = render.replace( match[ 0 ], "{.section " + match[ 1 ] + "}" );
-        render = render.replace( new RegExp( "{.repeated section " + match[ 1 ] + "}" ), "{.repeated section @}" );
-    }
+renderJsonTemplate = function ( render, data ) {
+    // @temporary fix
+    // @issues: {.if categories}...{.end} seems to blow up unanimously
+    // @issues: {.if categoryFilter}...{.end} seems to blow up unanimously
+    //render = replaceIssueIfBlocks( render );
 
     render = jsonTemplate.Template( render, jsontOptions );
     render = render.expand( data );
 
     return render;
-}
+};
 
 
 /******************************************************************************

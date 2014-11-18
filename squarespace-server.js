@@ -27,10 +27,9 @@ var _ = require( "underscore" ),
     sqsUser = null,
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
-    homepage = "homepage",
     directories = {},
     config = null,
-    app = express(),
+    expressApp = express(),
 
 
 /**
@@ -106,7 +105,7 @@ renderResponse = function ( appRequest, appResponse ) {
         cacheJson = null,
         cacheName = null,
         slugged = slug( appRequest.params[ 0 ] ),
-        reqSlug = ( slugged === "" ) ? homepage : slugged,
+        reqSlug = ( slugged === "" ) ? "homepage" : slugged,
         url = (config.server.siteurl + appRequest.params[ 0 ]),
         qrs = {};
 
@@ -396,16 +395,16 @@ processArguments = function ( args ) {
  */
 startServer = function () {
     // Create express application
-    app.use( express.static( config.server.webroot ) );
-    app.use( bodyParser.json() );
-    app.use( bodyParser.urlencoded( {extended: true} ) );
-    app.set( "port", config.server.port );
-    app.get( "*", onExpressRouterGET );
-    app.post( "/", onExpressRouterPOST );
-    app.listen( app.get( "port" ) );
+    expressApp.use( express.static( config.server.webroot ) );
+    expressApp.use( bodyParser.json() );
+    expressApp.use( bodyParser.urlencoded( {extended: true} ) );
+    expressApp.set( "port", config.server.port );
+    expressApp.get( "*", onExpressRouterGET );
+    expressApp.post( "/", onExpressRouterPOST );
+    expressApp.listen( expressApp.get( "port" ) );
 
     // Log that the server is running
-    functions.log( ("Running http://localhost:" + app.get( "port" )) );
+    functions.log( ("Running site on localhost:" + expressApp.get( "port" )) );
 };
 
 

@@ -41,7 +41,6 @@ var request = require( "request" ),
     sqsHeaders = [],
     sqsFooters = [],
     sqsUser = null,
-    homepage = "homepage",
     directories = {},
     config = null,
     scripts = [],
@@ -361,7 +360,7 @@ renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
         // Render {squarespace-footers} to the best of our ability
         rendered = rendered.replace( SQS_FOOTERS, sqsFooters.join( "" ) );
 
-        // Render Navigations from pageHtml
+        // Render Navigations from pageJson
         rendered = replaceNavigations( rendered, pageJson );
 
         // Render full clickThroughUrl's
