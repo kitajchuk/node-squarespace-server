@@ -10,7 +10,8 @@ var fs = require( "fs" ),
     forever = path.join( __dirname, "../", "node_modules", "forever", "bin", "forever" ),
     startup = path.join( __dirname, "../squarespace-startup.js" )
     functions = require( "../lib/functions" ),
-    foreverIdx = args.indexOf( "--forever" );
+    foreverIdx = args.indexOf( "--forever" ),
+    forneverIdx = args.indexOf( "--fornever" );
 
 // Start with forever process
 if ( foreverIdx !== -1 ) {
@@ -19,8 +20,16 @@ if ( foreverIdx !== -1 ) {
     // Splice --forever flag from the argument list
     args.splice( foreverIdx, 1 );
 
-    // @todo: Utilize --uid in order to support sqs stop-server or something like that
-    exec( (forever + " start " + startup + " " + args.join( " " ) + " --uid 'node-squarespace-server'"), function ( error, stdout ) {} );
+    exec( (forever + " --uid 'node-squarespace-server' start " + startup + " " + args.join( " " ) ), function ( error, stdout ) {} );
+
+// Stop server started with forever process
+} else if ( forneverIdx !== -1 ) {
+    functions.log( "Stopping server running forever daemon" );
+
+    // Splice --fornever flag from the argument list
+    args.splice( forneverIdx, 1 );
+
+    exec( (forever + " stop node-squarespace-server"), function ( error, stdout ) {} );
 
 // Standard node process
 } else {

@@ -346,7 +346,8 @@ processArguments = function ( args ) {
         console.log();
         console.log( "Options:" );
         console.log( "sqs --version    Print package version" );
-        console.log( "sqs --forever    Start server using forever-monitor" );
+        console.log( "sqs --forever    Start server using forever" );
+        console.log( "sqs --fornever   Stop server started with forever" );
         console.log( "sqs --port=XXXX  Use the specified port" );
         console.log();
         console.log( "Examples:" );

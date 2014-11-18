@@ -72,6 +72,9 @@ sqs server
 # Run the server with forever
 sqs server --forever
 
+# Stop server started with forever
+sqs --fornever
+
 # Run the server on a specific port
 sqs server --port=8000
 
