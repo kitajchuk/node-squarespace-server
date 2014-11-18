@@ -258,15 +258,15 @@ replaceSQSScripts = function () {
 /**
  *
  * @method getTemplateKey
- * @param {string} reqUri URI seg zero
  * @param {object} pageJson JSON data for page
  * @public
  *
  */
-getTemplateKey = function ( reqUri, pageJson ) {
+getTemplateKey = function ( pageJson ) {
     var template = null,
-        uriSegs = null,
-        regcheck = null;
+        regcheck = null,
+        typeName = null,
+        regionName = null;
 
     // This could happen, I suppose...
     if ( !pageJson ) {
@@ -274,63 +274,23 @@ getTemplateKey = function ( reqUri, pageJson ) {
         return;
     }
 
-    if ( reqUri === "/" ) {
-        uriSegs = [homepage];
+    // Grab the collection typeName
+    typeName = pageJson.collection.typeName;
 
+    // Grab the regionName
+    regionName = pageJson.collection.regionName;
+
+    // Handle collection item
+    if ( pageJson.item ) {
+        template = (typeName + ".item");
+
+    // Handle collection list
+    } else if ( pageJson.items ) {
+        template = (typeName + ".list");
+
+    // Handle page
     } else {
-        uriSegs = reqUri.replace( rSlash, "" ).split( "/" );
-    }
-
-    // This seems to be working for now
-    regcheck = new RegExp( (uriSegs[ 0 ] + "\\."), "i" );
-
-    for ( var tpl in templates ) {
-        if ( !rTplFiles.test( tpl ) ) {
-            continue;
-        }
-
-        // Homepage => This is a special case
-        if ( pageJson.collection.homepage && uriSegs.length === 1 ) {
-            // It is of type page, break and use region below
-            if ( pageJson.collection.typeName === "page" && pageJson.collection.regionName ) {
-                template = (pageJson.collection.regionName + ".region");
-                break;
-
-            // It is a collection and a .list of its type is located
-            } else if ( fs.existsSync( path.join( directories.collections, (pageJson.collection.typeName + ".list") ) ) ) {
-                template = (pageJson.collection.typeName + ".list");
-                break;
-            }
-
-        } else {
-            // 0 => Multiple URIs some/fresh/page
-            // 1 => Regular Expression tests out
-            // 2 => Filename tests out as a .item file
-            if ( uriSegs.length > 1 && regcheck.test( tpl ) && rItem.test( tpl ) ) {
-                template = tpl;
-                break;
-            }
-
-            // 0 => A Single URI page
-            // 1 => Regular Expression tests out
-            // 2 => Filename tests out as a .list file
-            if ( uriSegs.length === 1 && regcheck.test( tpl ) && rList.test( tpl ) ) {
-                template = tpl;
-                break;
-            }
-
-            // 1 => Regular Expression tests out
-            // 2 => Filename tests out as a .region file
-            if ( regcheck.test( tpl ) && rRegions.test( tpl ) ) {
-                template = tpl;
-                break;
-            }
-        }
-    }
-
-    // 0 => Template not matched above, use default
-    if ( !template ) {
-        template = "default.region";
+        template = (regionName + ".region");
     }
 
     functions.log( "TEMPLATE - " + template );
@@ -352,7 +312,7 @@ getTemplateKey = function ( reqUri, pageJson ) {
  */
 renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
     var queries = [],
-        templateKey = getTemplateKey( reqUri, pageJson ),
+        templateKey = getTemplateKey( pageJson ),
         rendered = "",
         matched = null,
         regionKey;
@@ -364,7 +324,7 @@ renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
     // 0.1 => Template is a list or item for a collection, NOT a region
     // What we are doing here is replicating the injection point for {squarespace.main-content} on collections
     if ( rItemOrList.test( templateKey ) ) {
-        regionKey = ((pageJson.collection.regionName || "default") + ".region");
+        regionKey = (pageJson.collection.regionName + ".region");
 
         // This wraps the matched collection template with the default or set region
         rendered += templates[ regionKey ].replace( SQS_MAIN_CONTENT, templates[ templateKey ] );
