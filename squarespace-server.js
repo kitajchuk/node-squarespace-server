@@ -183,9 +183,9 @@ renderResponse = function ( appRequest, appResponse ) {
     } else {
         sqsRequest.requestJsonAndHtml( url, qrs, function ( data ) {
             functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json );
-            functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashHtml( data.html ) );
+            functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html ) );
 
-            sqsTemplate.renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashHtml( data.html ), function ( tpl ) {
+            sqsTemplate.renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashContent( data.html ), function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
             });
         });
