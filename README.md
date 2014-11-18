@@ -5,29 +5,19 @@ node-squarespace-server
 
 
 ## Usage
-This is not published to [npm](http://npmjs.org) yet, there is a [milestone](https://github.com/kitajchuk/node-squarespace-server/milestones/NPM%20Published) for that. It works well in its current state as a beta program so I would still encourage its use. Log issues that you find or just hit me up about any notes or insights you have for it.
+This works well in its current state as a beta program so I would still encourage its use. Log issues that you find or just hit me up about any notes or insights you have for it.
 
 
 ## Installation
-For now, you will do this manually:
-
 ```shell
-git clone git@github.com:kitajchuk/node-squarespace-server.git
-
-cd node-squarespace-server
-
-npm install -g .
+npm install -g node-squarespace-server
 ```
 
 #### Updating
 For now you will do this manually:
 
 ```shell
-# cd to node-squarespace-server directory, wherever you cloned it to...
-
-git pull origin master
-
-npm install . -g
+npm update -g node-squarespace-server
 ```
 
 
@@ -107,7 +97,7 @@ When you make initial requests to the pages of your site, they will likely be sl
 
 
 ## Deploy
-All testing of this module has been done locally. Once testing is completed for running this on a deployed server expect the steps to be listed here.
+All testing of this module has primarily been done locally. Once further testing is completed for running this on a deployed server expect the steps to be listed here.
 
 
 
