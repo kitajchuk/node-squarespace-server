@@ -14,8 +14,6 @@ npm install -g node-squarespace-server
 ```
 
 #### Updating
-For now you will do this manually:
-
 ```shell
 npm update -g node-squarespace-server
 ```
