@@ -25,6 +25,7 @@ var request = require( "request" ),
     rItem = /\.item$/,
     rList = /\.list$/,
     rLess = /\.less$/,
+    rJson = /\{@\|json.*?\}/,
     rSQSQuery = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/,
     rSQSNavis = /<squarespace:navigation(.*?)\/\>/g,
     rSQSBlockFields = /<squarespace:block-field(.*?)\/\>/g,
@@ -209,13 +210,15 @@ replaceScripts = function () {
 
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
-                token = functions.getToken();
-                scripts.push({
-                    token: token,
-                    script: matched[ j ]
-                });
+                if ( !rJson.test( matched[ j ] ) ) {
+                    token = functions.getToken();
+                    scripts.push({
+                        token: token,
+                        script: matched[ j ]
+                    });
 
-                templates[ i ] = templates[ i ].replace( matched[ j ], token );
+                    templates[ i ] = templates[ i ].replace( matched[ j ], token );
+                }
             }
         }
     }
