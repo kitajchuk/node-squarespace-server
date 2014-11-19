@@ -13,8 +13,20 @@ var fs = require( "fs" ),
     foreverIdx = args.indexOf( "--forever" ),
     forneverIdx = args.indexOf( "--fornever" );
 
+
+// Warn and stop or print usage if no template.conf
+if ( !fs.existsSync( config ) ) {
+    if ( args.length ) {
+        functions.log( "Required template.conf not found" );
+
+        process.exit();
+
+    } else {
+        server.print();
+    }
+
 // Start with forever process
-if ( foreverIdx !== -1 ) {
+} else if ( foreverIdx !== -1 ) {
     functions.log( "Started server with forever" );
 
     // Splice --forever flag from the argument list

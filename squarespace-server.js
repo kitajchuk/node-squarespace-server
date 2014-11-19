@@ -30,6 +30,7 @@ var _ = require( "underscore" ),
     directories = {},
     config = null,
     expressApp = express(),
+    packageJson = functions.readJson( path.join( __dirname, "package.json" ) ),
 
 
 /**
@@ -326,33 +327,43 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
 /**
  *
+ * @method printUsage
+ * @private
+ *
+ */
+printUsage = function () {
+    console.log( "Squarespace Server" );
+    console.log( "Version " + packageJson.version );
+    console.log();
+    console.log( "Commands:" );
+    console.log( "sqs buster       Delete local site cache" );
+    console.log( "sqs server       Start the local server" );
+    console.log();
+    console.log( "Options:" );
+    console.log( "sqs --version    Print package version" );
+    console.log( "sqs --forever    Start server using forever" );
+    console.log( "sqs --fornever   Stop server started with forever" );
+    console.log( "sqs --port=XXXX  Use the specified port" );
+    console.log();
+    console.log( "Examples:" );
+    console.log( "sqs server --port=8000" );
+    process.exit();
+},
+
+
+/**
+ *
  * @method processArguments
  * @param {object} args The arguments array
  * @private
  *
  */
 processArguments = function ( args ) {
-    var data = functions.readJson( path.join( __dirname, "package.json" ) ),
-        flags = {},
+    var flags = {},
         commands = {};
 
     if ( !args || !args.length ) {
-        console.log( "Squarespace Server" );
-        console.log( "Version " + data.version );
-        console.log();
-        console.log( "Commands:" );
-        console.log( "sqs buster       Delete local site cache" );
-        console.log( "sqs server       Start the local server" );
-        console.log();
-        console.log( "Options:" );
-        console.log( "sqs --version    Print package version" );
-        console.log( "sqs --forever    Start server using forever" );
-        console.log( "sqs --fornever   Stop server started with forever" );
-        console.log( "sqs --port=XXXX  Use the specified port" );
-        console.log();
-        console.log( "Examples:" );
-        console.log( "sqs server --port=8000" );
-        process.exit();
+        printUsage();
     }
 
     _.each( args, function ( arg ) {
@@ -370,7 +381,7 @@ processArguments = function ( args ) {
 
     // Order of operations
     if ( flags.version ) {
-        functions.log( data.version );
+        functions.log( packageJson.version );
         process.exit();
 
     } else if ( commands.buster ) {
@@ -415,12 +426,10 @@ startServer = function () {
 module.exports = {
     /**
      *
-     * @export
-     * @public
-     * -------
      * @method init
      * @param {object} conf The template.conf json
      * @param {object} args The command arguments
+     * @public
      *
      */
     init: function ( conf, args ) {
@@ -435,5 +444,13 @@ module.exports = {
 
         // Handle arguments
         processArguments( args );
-    }
+    },
+
+    /**
+     *
+     * @method print
+     * @public
+     *
+     */
+    print: printUsage
 };
