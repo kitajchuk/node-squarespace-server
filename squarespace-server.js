@@ -140,7 +140,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
     // HTML cache?
     if ( fs.existsSync( cacheHtml ) ) {
-        cacheHtml = functions.readFile( path.join( config.server.cacheroot, (cacheName + ".html") ) );
+        cacheHtml = functions.readFileSquashed( path.join( config.server.cacheroot, (cacheName + ".html") ) );
 
     } else {
         cacheHtml = null;
@@ -241,7 +241,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     if ( !sqsUser ) {
         functions.log( "AUTH - Login to Squarespace!" );
 
-        appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
+        appResponse.send( functions.readFileSquashed( path.join( __dirname, "tpl/login.html" ) ) );
 
         return;
     }
@@ -290,7 +290,7 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
     if ( !data.email || !data.password ) {
         functions.log( "AUTH - Email AND Password required." );
 
-        appResponse.send( functions.readFile( path.join( __dirname, "tpl/login.html" ) ) );
+        appResponse.send( functions.readFileSquashed( path.join( __dirname, "tpl/login.html" ) ) );
 
         return;
     }
