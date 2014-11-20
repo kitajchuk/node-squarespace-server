@@ -377,7 +377,7 @@ renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
         }
 
         // Render Block Fields
-        replaceBlockFields( rendered, function ( finalRender ) {
+        replaceBlockFields( rendered, qrs, function ( finalRender ) {
             callback( finalRender );
         });
     }
@@ -660,11 +660,12 @@ getBlockTypeName = function ( type ) {
  *
  * @method replaceBlockFields
  * @param {string} rendered The template rendering
+ * @param {object} qrs The query string from the request
  * @param {function} callback The callback when done rendering
  * @private
  *
  */
-replaceBlockFields = function ( rendered, callback ) {
+replaceBlockFields = function ( rendered, qrs, callback ) {
     var layoutHtml = functions.readFile( path.join( __dirname, "tpl/layout.html" ) ),
         blockMatch = null,
         blockData = null,
@@ -684,6 +685,8 @@ replaceBlockFields = function ( rendered, callback ) {
             var block = blocks.shift();
 
             sqsRequest.requestWidgetHtml( block, function ( json ) {
+                var layout;
+
                 //functions.log( "WIDGET - ", json );
 
                 widgets[ block.id ] = json.html;
@@ -696,17 +699,21 @@ replaceBlockFields = function ( rendered, callback ) {
                             bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
 
                             for ( b = 0; b < bLen; b++ ) {
-                                blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ] ).replace( /"/g, "&quot;" );
+                                blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].value ).replace( /"/g, "&quot;" );
                                 blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].typeName = getBlockTypeName( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].type );
                                 blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].widgetHtml = widgets[ blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].id ];
                             }
                         }
                     }
 
-                    rendered = rendered.replace( blockMatch, mustache.render( layoutHtml, {
+                    layout = mustache.render( layoutHtml, {
                         attrs: blockAttrs,
                         data: blockData.data
-                    }));
+                    });
+
+                    rendered = rendered.replace( blockMatch, layout );
+
+                    functions.writeFile( path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") ), layout );
 
                     if ( !matched.length ) {
                         callback( rendered );
@@ -723,27 +730,34 @@ replaceBlockFields = function ( rendered, callback ) {
 
         function getBlocks() {
             var block = matched.shift(),
-                blockPathJson,
                 blockPathHtml,
-                blockJson,
                 blockHtml;
 
             blockAttrs = functions.getAttrObj( block );
             blockAttrs.columns = (12 / blockAttrs.columns);
             blockMatch = block;
-            blockPathJson = path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".json") );
             blockPathHtml = path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") );
 
-            if ( fs.existsSync( blockPathJson ) && fs.existsSync( blockPathHtml ) ) {
-                blockJson = functions.readJson( blockPathJson );
-                blockHtml = functions.readJson( blockPathHtml );
+            if ( fs.existsSync( blockPathHtml ) && qrs.nocache === undefined ) {
+                functions.log( "BLOCK CACHE - ", blockAttrs.id );
+
+                blockHtml = functions.readFile( blockPathHtml );
+
+                rendered = rendered.replace( blockMatch, blockHtml );
+
+                if ( !matched.length ) {
+                    callback( rendered );
+
+                } else {
+                    getBlocks();
+                }
 
             } else {
                 blocks = [];
                 widgets = {};
 
                 sqsRequest.requestBlockJson( blockAttrs.id, function ( json ) {
-                    functions.log( "BLOCK - ", blockAttrs.id );
+                    functions.log( "BLOCK GET - ", blockAttrs.id );
 
                     blockData = json;
 
