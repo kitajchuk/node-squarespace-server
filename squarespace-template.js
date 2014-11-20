@@ -3,7 +3,8 @@
  * Squarespace template.
  *
  */
-var path = require( "path" ),
+var _ = require( "underscore" ),
+    path = require( "path" ),
     fs = require( "fs" ),
     less = require( "less" ),
     uglifycss = require( "uglifycss" ),
@@ -586,13 +587,16 @@ replaceNavigations = function ( rendered, pageJson ) {
                     for ( k = 0, kLen = config.server.siteData.siteLayout.layout[ j ].links.length; k < kLen; k++ ) {
                         if ( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId ) {
                             items.push({
-                                active: false,
-                                folderActive: false,
+                                active: (config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId === pageJson.collection.id),
+                                folderActive: (config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId === pageJson.collection.id),
                                 collection: lookupCollection( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId )
                             });
 
                         } else {
-                            items.push( config.server.siteData.siteLayout.layout[ j ].links[ k ] );
+                            items.push( _.extend( config.server.siteData.siteLayout.layout[ j ].links[ k ], {
+                                active: (config.server.siteData.siteLayout.layout[ j ].links[ k ].title === pageJson.collection.title),
+                                folderActive: (config.server.siteData.siteLayout.layout[ j ].links[ k ].title === pageJson.collection.title)
+                            }));
                         }
                     }
 
