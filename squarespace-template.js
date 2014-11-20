@@ -125,7 +125,7 @@ compileCollections = function () {
             file = path.join( directories.collections, collections[ i ] );
 
             if ( fs.existsSync( file ) ) {
-                templates[ collections[ i ] ] = functions.readFile( file );
+                templates[ collections[ i ] ] = functions.readFileSquashed( file );
             }
         }
     }
@@ -153,7 +153,7 @@ compileRegions = function () {
             // templates.__HEADER
             // templates.__FOOTER
             if ( !rHeader.test( files[ j ] ) && !rFooter.test( files[ j ] ) ) {
-                file += functions.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) );
+                file += functions.readFileSquashed( path.join( config.server.webroot, (files[ j ] + ".region") ) );
             }
         }
 
@@ -181,7 +181,7 @@ replaceBlocks = function () {
         while ( matched = templates[ i ].match( rBlockIncs ) ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
                 block = matched[ j ].replace( rBlockTags, "" );
-                filed = functions.readFile( path.join( directories.blocks, block ) );
+                filed = functions.readFileSquashed( path.join( directories.blocks, block ) );
 
                 templates[ i ] = templates[ i ].replace( matched[ j ], filed );
             }
@@ -438,7 +438,7 @@ compileStylesheets = function ( callback ) {
         file;
 
     if ( fs.existsSync( reset ) ) {
-        pureCss += functions.readFile( reset );
+        pureCss += functions.readFileSquashed( reset );
     }
 
     for ( var i = 0, len = config.stylesheets.length; i < len; i++ ) {
@@ -491,10 +491,10 @@ setHeaderFooter = function () {
 
     for ( i = files.length; i--; ) {
         if ( rRegions.test( files[ i ] ) && rHeader.test( files[ i ] ) ) {
-            templates.__HEADER = functions.readFile( path.join( config.server.webroot, files[ i ] ) );
+            templates.__HEADER = functions.readFileSquashed( path.join( config.server.webroot, files[ i ] ) );
 
         } else if ( rRegions.test( files[ i ] ) && rFooter.test( files[ i ] ) ) {
-            templates.__FOOTER = functions.readFile( path.join( config.server.webroot, files[ i ] ) );
+            templates.__FOOTER = functions.readFileSquashed( path.join( config.server.webroot, files[ i ] ) );
         }
     }
 },
@@ -577,7 +577,7 @@ replaceNavigations = function ( rendered, pageJson ) {
         for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
             attrs = functions.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
-            template = functions.readFile( path.join( directories.blocks, block ) );
+            template = functions.readFileSquashed( path.join( directories.blocks, block ) );
 
             for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
                 if ( config.server.siteData.siteLayout.layout[ j ].identifier === attrs.navigationId ) {
@@ -666,7 +666,7 @@ getBlockTypeName = function ( type ) {
  *
  */
 replaceBlockFields = function ( rendered, qrs, callback ) {
-    var layoutHtml = functions.readFile( path.join( __dirname, "tpl/layout.html" ) ),
+    var layoutHtml = functions.readFileSquashed( path.join( __dirname, "tpl/layout.html" ) ),
         blockMatch = null,
         blockData = null,
         blockAttrs = null,
@@ -739,7 +739,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
             blockPathHtml = path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") );
 
             if ( fs.existsSync( blockPathHtml ) && qrs.nocache === undefined ) {
-                functions.log( "BLOCK CACHE - ", blockAttrs.id );
+                functions.log( "BLOCK CACHE -", blockAttrs.id );
 
                 blockHtml = functions.readFile( blockPathHtml );
 
@@ -757,7 +757,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 widgets = {};
 
                 sqsRequest.requestBlockJson( blockAttrs.id, function ( json ) {
-                    functions.log( "BLOCK GET - ", blockAttrs.id );
+                    functions.log( "BLOCK GET -", blockAttrs.id );
 
                     blockData = json;
 
