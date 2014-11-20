@@ -7,6 +7,7 @@ var _ = require( "underscore" ),
     request = require( "request" ),
     path = require( "path" ),
     fs = require( "fs" ),
+    cookieParser = require( "cookie" ),
     functions = require( "./lib/functions" ),
     sqsRender = require( "./squarespace-render" ),
     rSlash = /^\/|\/$/g,
@@ -16,11 +17,12 @@ var _ = require( "underscore" ),
     API_GET_COLLECTIONS = "/api/commondata/GetCollections/",
     //API_GET_TEMPLATE = "/api/template/GetTemplate/", // ?templateId
     API_GET_BLOCKFIELDS = "/api/block-fields/",
-    //API_GET_WIDGETRENDERING = "/api/widget/GetWidgetRendering/",
+    API_GET_WIDGETRENDERING = "/api/widget/GetWidgetRendering/",
     API_AUTH_LOGIN = "/api/auth/Login/",
     sqsLoginHeaders = null,
+    sqsLoginCrumb = null,
     config = null,
-    sqsUser,
+    sqsUser = null,
 
 
 /******************************************************************************
@@ -59,6 +61,9 @@ setUser = function ( user ) {
  *
  */
 loginPortal = function ( callback ) {
+    var cookie,
+        cookieParsed;
+
     // POST to login
     request({
         method: "POST",
@@ -87,7 +92,8 @@ loginPortal = function ( callback ) {
             }
 
             // Get the response cookie we need
-            var cookie = response.headers[ "set-cookie" ].join( ";" );
+            cookie = response.headers[ "set-cookie" ].join( ";" );
+            cookieParsed = cookieParser.parse( cookie );
 
             // Set request headers we will use
             headers = getHeaders({
@@ -96,6 +102,9 @@ loginPortal = function ( callback ) {
 
             // Store headers here
             sqsLoginHeaders = headers;
+
+            // Store crumb here
+            sqsLoginCrumb = cookieParsed.crumb;
 
             callback( headers );
         });
@@ -317,6 +326,64 @@ requestQuery = function ( query, qrs, pageJson, callback ) {
 },
 
 
+/**
+ *
+ * @method requestBlockJson
+ * @param {string} blockId The block id
+ * @param {function} callback Fired when done
+ * @public
+ *
+ */
+requestBlockJson = function ( blockId, callback ) {
+    request({
+        url: (config.server.siteurl + API_GET_BLOCKFIELDS + blockId),
+        json: true,
+        headers: sqsLoginHeaders,
+        qs: sqsUser
+
+    }, function ( error, response, json ) {
+        if ( error ) {
+            functions.log( "ERROR - " + error );
+            return;
+        }
+
+        // check first, block could be "undefined"
+        if ( json ) {
+            callback( json );
+        }
+    });
+},
+
+
+/**
+ *
+ * @method requestWidgetHtml
+ * @param {object} blockJSON The block data object
+ * @param {function} callback Fired when done
+ * @public
+ *
+ */
+requestWidgetHtml = function ( blockJSON, callback ) {
+    request({
+        method: "POST",
+        url: (config.server.siteurl + API_GET_WIDGETRENDERING),
+        headers: sqsLoginHeaders,
+        qs: {
+            crumb: sqsLoginCrumb
+        },
+        form: {
+            widgetJSON: JSON.stringify( blockJSON ),
+            collectionId: ""
+        }
+
+    }, function ( error, response, string ) {
+        string = string.replace( /\\uFFFD/g, "" );
+
+        callback( JSON.parse( string ) );
+    });
+},
+
+
 /******************************************************************************
  * @Private
 *******************************************************************************/
@@ -354,7 +421,6 @@ module.exports = {
     requestHtml: requestHtml,
     requestJsonAndHtml: requestJsonAndHtml,
     fetchAPIData: fetchAPIData,
-
-    // @temp: remove this when block-field rending is resolved
-    API_GET_BLOCKFIELDS: API_GET_BLOCKFIELDS
+    requestBlockJson: requestBlockJson,
+    requestWidgetHtml: requestWidgetHtml
 };
