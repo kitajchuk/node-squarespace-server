@@ -4,10 +4,6 @@ node-squarespace-server
 > A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com). **Note: This currently isn't working with sandbox accounts in trial mode**.
 
 
-### Usage
-This works well in its current state as a beta program so I would still encourage its use. Log issues that you find or just hit me up about any notes or insights you have for it.
-
-
 ### Installation
 ```shell
 npm install -g node-squarespace-server
