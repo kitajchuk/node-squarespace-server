@@ -280,7 +280,7 @@ getTemplateKey = function ( pageJson ) {
     typeName = pageJson.collection.typeName;
 
     // Grab the regionName
-    regionName = pageJson.collection.regionName;
+    regionName = (pageJson.collection.regionName || "default");
 
     // Handle collection item
     if ( pageJson.item ) {
