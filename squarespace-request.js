@@ -181,7 +181,10 @@ requestHtml = function ( url, qrs, callback ) {
             return;
         }
 
-        callback( html );
+        callback({
+            html: html,
+            status: response.statusCode
+        });
     });
 },
 
@@ -215,7 +218,10 @@ requestJson = function ( url, qrs, callback ) {
             return;
         }
 
-        callback( json );
+        callback({
+            json: json,
+            status: response.statusCode
+        });
     });
 },
 

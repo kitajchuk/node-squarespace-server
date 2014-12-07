@@ -183,10 +183,18 @@ renderResponse = function ( appRequest, appResponse ) {
     // Request page?
     } else {
         sqsRequest.requestJsonAndHtml( url, qrs, function ( data ) {
-            functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json );
-            functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html ) );
+            if ( data.html.status === 404 || data.json.status === 404 ) {
+                appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/404.html" ) ) );
 
-            sqsTemplate.renderTemplate( appRequest.params[ 0 ], qrs, data.json, functions.squashContent( data.html ), function ( tpl ) {
+                functions.log( "404 - Handled" );
+
+                return;
+            }
+
+            functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json.json );
+            functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
+
+            sqsTemplate.renderTemplate( appRequest.params[ 0 ], qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
             });
         });
@@ -241,7 +249,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     if ( !sqsUser ) {
         functions.log( "AUTH - Login to Squarespace!" );
 
-        appResponse.send( functions.readFileSquashed( path.join( __dirname, "tpl/login.html" ) ) );
+        appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/login.html" ) ) );
 
         return;
     }
