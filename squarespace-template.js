@@ -433,13 +433,13 @@ renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
  */
 compileStylesheets = function ( callback ) {
     var reset = path.join( directories.styles, "reset.css" ),
-        lessCss = "",
-        pureCss = "",
         fpath,
         file;
 
+    siteCss = "";
+
     if ( fs.existsSync( reset ) ) {
-        pureCss += functions.readFileSquashed( reset );
+        siteCss += uglifycss.processString( functions.readFileSquashed( reset ) );
     }
 
     for ( var i = 0, len = config.stylesheets.length; i < len; i++ ) {
@@ -452,18 +452,18 @@ compileStylesheets = function ( callback ) {
         file = ("" + fs.readFileSync( fpath ));
 
         if ( rLess.test( config.stylesheets[ i ] ) ) {
-            lessCss += file;
+            less.render( file, function ( error, css ) {
+                siteCss += css;
+            });
+
+            functions.log( ("LESS - " + config.stylesheets[ i ]) );
 
         } else {
-            pureCss += file;
+            siteCss += uglifycss.processString( file );
+
+            functions.log( ("CSS - " + config.stylesheets[ i ]) );
         }
     }
-
-    less.render( lessCss, function ( error, css ) {
-        lessCss = css;
-    });
-
-    siteCss = uglifycss.processString( (pureCss + lessCss) );
 
     return callback;
 },
