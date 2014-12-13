@@ -70,6 +70,11 @@ This runs the [express](http://expressjs.com) server on the relevant port. The d
 
 
 
+### Middleware
+This uses the [node-squarespace-middleware](https://github.com/kitajchuk/node-squarespace-middleware) to interface with your Squarespace site.
+
+
+
 ### Workflow
 You can use any front-end workflow you like when working with a custom Squarespace template. At the very least the separation of your source files and your actual template is recommended. I have developed a [grunt](http://gruntjs.com) workflow that bootstraps a [grunt-nautilus](https://github.com/kitajchuk/grunt-nautilus) based approach: [grunt-init-squarespace](https://github.com/kitajchuk/grunt-init-squarespace). At the very least, this is a good example of how to go about setting up your own workflow which keeps your source and template code separate.
 
