@@ -163,17 +163,14 @@
             var login = document.getElementById( "login" ),
                 email = document.getElementById( "email" ),
                 password = document.getElementById( "password" ),
-                spinner = document.getElementById( "spinner" ),
-                isPosting = false;
+                spinner = document.getElementById( "spinner" );
 
+            /* Capture login form post */
             login.addEventListener( "submit", function ( e ) {
-                if ( isPosting ) {
-                    return;
-                }
-
-                isPosting = true;
+                e.preventDefault();
 
                 var xhr = new XMLHttpRequest();
+
                 xhr.open( "POST", this.action, true );
                 xhr.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded" );
 
@@ -185,15 +182,14 @@
                     }
                 };
 
-                xhr.send( "email=" + email.value + "&password=" + password.value );
+                xhr.send( ("email=" + email.value + "&password=" + encodeURIComponent( password.value )) );
 
                 login.className = "";
                 spinner.className = "is-active";
 
-                e.preventDefault();
-
             }, false );
 
+            /* Reveal the login form */
             setTimeout(function () {
                 login.className = "is-active";
 
