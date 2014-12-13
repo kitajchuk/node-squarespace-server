@@ -17,8 +17,8 @@ var _ = require( "underscore" ),
     fs = require( "fs" ),
     fse = require( "fs-extra" ),
     slug = require( "slug" ),
+    sqsMiddleware = require( "node-squarespace-middleware" ),
     functions = require( "./lib/functions" ),
-    sqsRequest = require( "./squarespace-request" ),
     sqsTemplate = require( "./squarespace-template" ),
     rProtocol = /^https:|^http:/g,
     rSlash = /^\/|\/$/g,
@@ -40,8 +40,9 @@ var _ = require( "underscore" ),
  *      port,
  *      webroot,
  *      protocol,
- *      siteData
- *      cacheroot
+ *      siteData,
+ *      cacheroot,
+ *      password
  * };
  *
  * @method setServerConfig
@@ -64,8 +65,14 @@ setServerConfig = function () {
         }
     }
 
+    // Set config for middleware
+    sqsMiddleware.set( "siteurl", config.server.siteurl );
+
+    if ( config.server.password ) {
+        sqsMiddleware.set( "sitepassword", config.server.password );
+    }
+
     // Set config on external modules
-    sqsRequest.setConfig( config );
     sqsTemplate.setConfig( config );
 },
 
@@ -107,15 +114,15 @@ renderResponse = function ( appRequest, appResponse ) {
         cacheName = null,
         slugged = slug( appRequest.params[ 0 ] ),
         reqSlug = ( slugged === "" ) ? "homepage" : slugged,
-        url = (config.server.siteurl + appRequest.params[ 0 ]),
+        url = appRequest.params[ 0 ],
         qrs = {};
 
     cacheName = ("page-" + reqSlug);
 
     // Password?
-    if ( config.server.password ) {
-        qrs.password = config.server.password;
-    }
+    //if ( config.server.password ) {
+    //    qrs.password = config.server.password;
+    //}
 
     // Querystring?
     for ( var i in appRequest.query ) {
@@ -158,7 +165,7 @@ renderResponse = function ( appRequest, appResponse ) {
     if ( cacheJson && cacheHtml && appRequest.query.format !== "json" ) {
         functions.log( "Loading request from cache" );
 
-        sqsTemplate.renderTemplate( appRequest.params[ 0 ], qrs, cacheJson, cacheHtml, function ( tpl ) {
+        sqsTemplate.renderTemplate( qrs, cacheJson, cacheHtml, function ( tpl ) {
             appResponse.status( 200 ).send( tpl );
         });
 
@@ -173,7 +180,7 @@ renderResponse = function ( appRequest, appResponse ) {
             appResponse.status( 200 ).json( cacheJson );
 
         } else {
-            sqsRequest.requestJson( url, qrs, function ( json ) {
+            sqsMiddleware.getJson( url, qrs, function ( json ) {
                 functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), json );
 
                 appResponse.status( 200 ).json( json );
@@ -182,7 +189,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
     // Request page?
     } else {
-        sqsRequest.requestJsonAndHtml( url, qrs, function ( data ) {
+        sqsMiddleware.getJsonAndHtml( url, qrs, function ( data ) {
             if ( data.html.status === 404 || data.json.status === 404 ) {
                 appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/404.html" ) ) );
 
@@ -194,7 +201,7 @@ renderResponse = function ( appRequest, appResponse ) {
             functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json.json );
             functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
 
-            sqsTemplate.renderTemplate( appRequest.params[ 0 ], qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
+            sqsTemplate.renderTemplate( qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
                 appResponse.status( 200 ).send( tpl );
             });
         });
@@ -306,19 +313,21 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
     // Keep user data in memory
     sqsUser = data;
 
+    // Set middleware config
+    sqsMiddleware.set( "useremail", data.email );
+    sqsMiddleware.set( "userpassword", data.password );
+
     // Set user on external modules
-    sqsRequest.setUser( sqsUser );
     sqsTemplate.setUser( sqsUser );
 
     // Login to site
-    sqsRequest.loginPortal( function () {
+    sqsMiddleware.doLogin(function () {
         // Fetch site API data
-        sqsRequest.fetchAPIData( function ( data ) {
+        sqsMiddleware.getAPIData( function ( data ) {
             // Store the site data needed
             config.server.siteData = data;
 
             // Set config on external modules
-            sqsRequest.setConfig( config );
             sqsTemplate.setConfig( config );
 
             // Store time of login

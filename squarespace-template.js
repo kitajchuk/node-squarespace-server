@@ -9,11 +9,12 @@ var _ = require( "underscore" ),
     less = require( "less" ),
     uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
+    sqsMiddleware = require( "node-squarespace-middleware" ),
     functions = require( "./lib/functions" ),
     blocktypes = require( "./lib/blocktypes" ),
-    sqsRequest = require( "./squarespace-request" ),
     sqsRender = require( "./squarespace-render" ),
     rSlash = /^\/|\/$/g,
+    rJsonT = /^\{.*?\}$/,
     rHeader = /header/,
     rFooter = /footer/,
     rScripts = /<script.*?\>(.*?)<\/script\>/g,
@@ -304,7 +305,6 @@ getTemplateKey = function ( pageJson ) {
 /**
  *
  * @method renderTemplate
- * @param {string} reqUri URI seg zero
  * @param {object} qrs Querystring mapping
  * @param {object} pageJson JSON data for page
  * @param {string} pageHtml HTML for page
@@ -312,7 +312,7 @@ getTemplateKey = function ( pageJson ) {
  * @public
  *
  */
-renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
+renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     var queries = [],
         templateKey = getTemplateKey( pageJson ),
         rendered = "",
@@ -383,35 +383,71 @@ renderTemplate = function ( reqUri, qrs, pageJson, pageHtml, callback ) {
         });
     }
 
-    function handleQueried( query, data, json ) {
-        var items = [],
+    function handleQueried() {
+        if ( !queries.length ) {
+            handleDone();
+            return;
+        }
+
+        var query = queries.shift(),
+            queryData = functions.getAttrObj( query[ 1 ] ),
+            jsonTMatch = queryData.collection.match( rJsonT ),
+            cacheSlug = "",
             tpl;
 
-        if ( query && data && json ) {
-            if ( data.featured ) {
-                for ( i = 0, len = json.items.length; i < len; i++ ) {
-                    if ( json.items[ i ].starred ) {
-                        items.push( json.items[ i ] );
-                    }
-                }
+        if ( jsonTMatch ) {
+            jsonTMatch = jsonTMatch[ 0 ];
 
-                json.items = items;
-            }
+            queryData.collection = sqsRender.renderJsonTemplate( jsonTMatch, pageJson );
+        }
 
-            if ( data.limit ) {
-                json.items.splice( 0, (json.items.length - data.limit) );
+        cacheSlug = ("query-" + queryData.collection);
+
+        for ( var i in qrs ) {
+            // Skip password in unique cache
+            if ( i !== "format" && i !== "password" && i !== "nocache" ) {
+                cacheSlug += ("-" + i + "--" + qrs[ i ]);
             }
+        }
+
+        // Tag?
+        if ( queryData.tag ) {
+            cacheSlug += "-tag--" + queryData.tag;
+        }
+
+        // Category?
+        if ( queryData.category ) {
+            cacheSlug += "-category--" + queryData.category;
+        }
+
+        cacheSlug = path.join( config.server.cacheroot, (cacheSlug + ".json") );
+
+        // Cached?
+        if ( fs.existsSync( cacheSlug ) && qrs.nocache === undefined ) {
+            functions.log( "CACHE - Loading cached query" );
+
+            json = functions.readJson( cacheSlug );
 
             tpl = sqsRender.renderJsonTemplate( query[ 2 ], json );
 
             rendered = rendered.replace( query[ 2 ], tpl );
-        }
 
-        if ( queries.length ) {
-            sqsRequest.requestQuery( queries.shift(), qrs, pageJson, handleQueried );
+            handleQueried();
 
         } else {
-            handleDone();
+            if ( qrs.nocache !== undefined ) {
+                functions.log( "CACHE - Clearing cached query: ", queryData.collection );
+            }
+
+            sqsMiddleware.getQuery( queryData, qrs, function ( json ) {
+                functions.writeJson( cacheSlug, json );
+
+                tpl = sqsRender.renderJsonTemplate( query[ 2 ], json );
+
+                rendered = rendered.replace( query[ 2 ], tpl );
+
+                handleQueried();
+            });
         }
     }
 
@@ -688,7 +724,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
         function getWidget() {
             var block = blocks.shift();
 
-            sqsRequest.requestWidgetHtml( block, function ( json ) {
+            sqsMiddleware.getWidgetHtml( block, function ( json ) {
                 var layout;
 
                 //functions.log( "WIDGET - ", json );
@@ -760,7 +796,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 blocks = [];
                 widgets = {};
 
-                sqsRequest.requestBlockJson( blockAttrs.id, function ( json ) {
+                sqsMiddleware.getBlockJson( blockAttrs.id, function ( json ) {
                     functions.log( "BLOCK GET -", blockAttrs.id );
 
                     blockData = json;
