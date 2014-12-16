@@ -34,6 +34,15 @@ If you are using a site-wide password, then you would have the following:
 }
 ```
 
+If you are running a site in sandbox trial mode, then you would have the following:
+
+```json
+"server": {
+    "siteurl": "https://yoursite.squarespace.com",
+    "sandbox": true
+}
+```
+
 And you will want to add this to your `.gitignore`:
 
 ```shell
