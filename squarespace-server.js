@@ -24,6 +24,7 @@ var _ = require( "underscore" ),
     rSlash = /^\/|\/$/g,
     rIco = /\.ico$/,
     rApi = /^\/api/,
+    rUniversal = /^\/universal/,
     sqsUser = null,
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
@@ -70,6 +71,10 @@ setServerConfig = function () {
 
     if ( config.server.password ) {
         sqsMiddleware.set( "sitepassword", config.server.password );
+    }
+
+    if ( config.server.sandbox ) {
+        sqsMiddleware.set( "sandboxmode", true );
     }
 
     // Set config on external modules
@@ -225,8 +230,8 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
         return;
     }
 
-    // Maybe just do a redirect here?
-    if ( rIco.test( appRequest.params[ 0 ] ) ) {
+    // Favicon / Universal Image
+    if ( rIco.test( appRequest.params[ 0 ] ) || rUniversal.test( appRequest.params[ 0 ] ) ) {
         appResponse.redirect( (config.server.siteurl + appRequest.params[ 0 ]) );
 
         return;

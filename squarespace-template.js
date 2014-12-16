@@ -326,7 +326,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     // 0.1 => Template is a list or item for a collection, NOT a region
     // What we are doing here is replicating the injection point for {squarespace.main-content} on collections
     if ( rItemOrList.test( templateKey ) ) {
-        regionKey = (pageJson.collection.regionName + ".region");
+        regionKey = ((pageJson.collection.regionName || "default") + ".region");
 
         // This wraps the matched collection template with the default or set region
         rendered += templates[ regionKey ].replace( SQS_MAIN_CONTENT, templates[ templateKey ] );
@@ -559,7 +559,13 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
 
     // Headers?
     if ( sHeadersFull ) {
-        sHeadersFull = sHeadersFull[ 0 ];
+        // Override isWrappedForDamask to ensure public site loads
+        if ( config.server.sandbox ) {
+            sHeadersFull = sHeadersFull[ 0 ].replace(
+                'Squarespace.load(window);',
+                'Squarespace.isWrappedForDamask=function(){return true;};Squarespace.load(window);'
+            );
+        }
         siteStyleTag = '<!-- ' + config.name + ' Local Styles --><style type="text/css">' + siteCss + '</style>';
         sHeadersFull += siteStyleTag;
         sqsHeaders.push( tokenHeadersFull );
