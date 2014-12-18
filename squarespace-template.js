@@ -439,14 +439,19 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
                 functions.log( "CACHE - Clearing cached query: ", queryData.collection );
             }
 
-            sqsMiddleware.getQuery( queryData, qrs, function ( json ) {
-                functions.writeJson( cacheSlug, json );
+            sqsMiddleware.getQuery( queryData, qrs, function ( error, json ) {
+                if ( !error ) {
+                    functions.writeJson( cacheSlug, json );
 
-                tpl = sqsRender.renderJsonTemplate( query[ 2 ], json );
+                    tpl = sqsRender.renderJsonTemplate( query[ 2 ], json );
 
-                rendered = rendered.replace( query[ 2 ], tpl );
+                    rendered = rendered.replace( query[ 2 ], tpl );
 
-                handleQueried();
+                    handleQueried();
+
+                } else {
+                    // Handle errors
+                }
             });
         }
     }
@@ -730,46 +735,51 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
         function getWidget() {
             var block = blocks.shift();
 
-            sqsMiddleware.getWidgetHtml( block, function ( json ) {
+            sqsMiddleware.getWidgetHtml( block, function ( error, json ) {
                 var layout;
 
-                //functions.log( "WIDGET - ", json );
+                if ( !error ) {
+                    functions.log( "WIDGET GET - ", json );
 
-                widgets[ block.id ] = json.html;
+                    widgets[ block.id ] = json.html;
 
-                if ( !blocks.length ) {
-                    for ( r = 0; r < rLen; r++ ) {
-                        cLen = blockData.data.layout.rows[ r ].columns.length;
+                    if ( !blocks.length ) {
+                        for ( r = 0; r < rLen; r++ ) {
+                            cLen = blockData.data.layout.rows[ r ].columns.length;
 
-                        for ( c = 0; c < cLen; c++ ) {
-                            bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
+                            for ( c = 0; c < cLen; c++ ) {
+                                bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
 
-                            for ( b = 0; b < bLen; b++ ) {
-                                blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].value ).replace( /"/g, "&quot;" );
-                                blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].typeName = getBlockTypeName( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].type );
-                                blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].widgetHtml = widgets[ blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].id ];
+                                for ( b = 0; b < bLen; b++ ) {
+                                    blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].value ).replace( /"/g, "&quot;" );
+                                    blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].typeName = getBlockTypeName( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].type );
+                                    blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].widgetHtml = widgets[ blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].id ];
+                                }
                             }
                         }
-                    }
 
-                    layout = mustache.render( layoutHtml, {
-                        attrs: blockAttrs,
-                        data: blockData.data
-                    });
+                        layout = mustache.render( layoutHtml, {
+                            attrs: blockAttrs,
+                            data: blockData.data
+                        });
 
-                    rendered = rendered.replace( blockMatch, layout );
+                        rendered = rendered.replace( blockMatch, layout );
 
-                    functions.writeFile( path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") ), layout );
+                        functions.writeFile( path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") ), layout );
 
-                    if ( !matched.length ) {
-                        callback( rendered );
+                        if ( !matched.length ) {
+                            callback( rendered );
 
+                        } else {
+                            getBlocks();
+                        }
+                        
                     } else {
-                        getBlocks();
+                        getWidget();
                     }
-                    
+
                 } else {
-                    getWidget();
+                    // Handle errors
                 }
             });
         }
@@ -802,26 +812,32 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 blocks = [];
                 widgets = {};
 
-                sqsMiddleware.getBlockJson( blockAttrs.id, function ( json ) {
-                    functions.log( "BLOCK GET -", blockAttrs.id );
+                sqsMiddleware.getBlockJson( blockAttrs.id, function ( error, json ) {
+                    if ( !error ) {
+                        functions.log( "BLOCK GET -", blockAttrs.id );
 
-                    blockData = json;
+                        blockData = json;
 
-                    rLen = blockData.data.layout.rows.length;
+                        rLen = blockData.data.layout.rows.length;
 
-                    for ( r = 0; r < rLen; r++ ) {
-                        cLen = blockData.data.layout.rows[ r ].columns.length;
+                        for ( r = 0; r < rLen; r++ ) {
+                            cLen = blockData.data.layout.rows[ r ].columns.length;
 
-                        for ( c = 0; c < cLen; c++ ) {
-                            bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
+                            for ( c = 0; c < cLen; c++ ) {
+                                bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
 
-                            for ( b = 0; b < bLen; b++ ) {
-                                blocks.push( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ] );
+                                for ( b = 0; b < bLen; b++ ) {
+                                    blocks.push( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ] );
+                                }
                             }
                         }
-                    }
 
-                    getWidget();
+                        getWidget();
+
+                    } else {
+                        // Handle errors
+                        getBlocks();
+                    }
                 });
             }
         }

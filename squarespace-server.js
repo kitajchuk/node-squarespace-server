@@ -185,30 +185,42 @@ renderResponse = function ( appRequest, appResponse ) {
             appResponse.status( 200 ).json( cacheJson );
 
         } else {
-            sqsMiddleware.getJson( url, qrs, function ( json ) {
-                functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), json );
+            sqsMiddleware.getJson( url, qrs, function ( error, json ) {
+                if ( !error ) {
+                    functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), json );
 
-                appResponse.status( 200 ).json( json );
+                    appResponse.status( 200 ).json( json );
+
+                } else {
+                    // Handle errors
+                    functions.log( "ERROR - " + error );
+                }
             });
         }
 
     // Request page?
     } else {
-        sqsMiddleware.getJsonAndHtml( url, qrs, function ( data ) {
-            if ( data.html.status === 404 || data.json.status === 404 ) {
-                appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/404.html" ) ) );
+        sqsMiddleware.getJsonAndHtml( url, qrs, function ( error, data ) {
+            if ( !error ) {
+                if ( data.html.status === 404 || data.json.status === 404 ) {
+                    appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/404.html" ) ) );
 
-                functions.log( "404 - Handled" );
+                    functions.log( "404 - Handled" );
 
-                return;
+                    return;
+                }
+
+                functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json.json );
+                functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
+
+                sqsTemplate.renderTemplate( qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
+                    appResponse.status( 200 ).send( tpl );
+                });
+
+            } else {
+                // Handle errors
+                functions.log( "ERROR - " + error );
             }
-
-            functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json.json );
-            functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
-
-            sqsTemplate.renderTemplate( qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
-                appResponse.status( 200 ).send( tpl );
-            });
         });
     }
 },
@@ -326,23 +338,38 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
     sqsTemplate.setUser( sqsUser );
 
     // Login to site
-    sqsMiddleware.doLogin(function () {
-        // Fetch site API data
-        sqsMiddleware.getAPIData( function ( data ) {
-            // Store the site data needed
-            config.server.siteData = data;
+    sqsMiddleware.doLogin(function ( error ) {
+        if ( !error ) {
+            // Fetch site API data
+            sqsMiddleware.getAPIData( function ( error, data ) {
+                if ( !error ) {
+                    // Store the site data needed
+                    config.server.siteData = data;
 
-            // Set config on external modules
-            sqsTemplate.setConfig( config );
+                    // Set config on external modules
+                    sqsTemplate.setConfig( config );
 
-            // Store time of login
-            sqsTimeOfLogin = Date.now();
+                    // Store time of login
+                    sqsTimeOfLogin = Date.now();
 
-            // End login post
-            appResponse.json({
-                success: true
+                    // End login post
+                    appResponse.json({
+                        success: true
+                    });
+
+                } else {
+                    // Handle errors
+                    functions.log( "ERROR - " + error );
+                }
             });
-        });
+
+        } else {
+            // Handle errors
+            functions.log( "ERROR - " + error );
+
+            // Reload login
+            appResponse.redirect( "/" );
+        }
     });
 },
 
