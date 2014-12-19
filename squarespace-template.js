@@ -27,6 +27,7 @@ var _ = require( "underscore" ),
     rList = /\.list$/,
     rLess = /\.less$/,
     rJson = /\{@\|json.*?\}/,
+    rBodyTag = /<body.*?\>/,
     rSQSQuery = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/,
     rSQSNavis = /<squarespace:navigation(.*?)\/\>/g,
     rSQSBlockFields = /<squarespace:block-field(.*?)\/\>/g,
@@ -99,14 +100,18 @@ setUser = function ( user ) {
  * @private
  *
  */
-replaceSQSTags = function ( rendered, pageJson ) {
+replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
     var pageType = pageJson.item ? "item" : "collection",
-        pageId = pageJson.item ? pageJson.item.id : pageJson.collection.id;
+        pageId = pageJson.item ? pageJson.item.id : pageJson.collection.id,
+        bodyElem = pageHtml.match( rBodyTag ),
+        bodyAttr = functions.getAttrObj( bodyElem[ 0 ] );
 
     rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
-    rendered = rendered.replace( SQS_PAGE_CLASSES, "" );
-    rendered = rendered.replace( new RegExp( SQS_PAGE_ID, "g" ), (pageType + "-" + pageId) );
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
+    rendered = rendered.replace( SQS_PAGE_CLASSES, bodyAttr.class );
+
+    // In case fools be using this #id more than once, WTF :-P
+    rendered = rendered.replace( new RegExp( SQS_PAGE_ID, "g" ), (pageType + "-" + pageId) );
 
     return rendered;
 },
@@ -340,7 +345,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     }
 
     // SQS Tags?
-    rendered = replaceSQSTags( rendered, pageJson );
+    rendered = replaceSQSTags( rendered, pageJson, pageHtml );
 
     // Queries
     // 0 => Full
@@ -744,13 +749,11 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
         function getWidget() {
             var block = blocks.shift();
 
-            console.log( "block", block );
-
             sqsMiddleware.getWidgetHtml( block, function ( error, json ) {
                 var layout;
 
                 if ( !error ) {
-                    functions.log( "WIDGET GET - ", json );
+                    functions.log( "WIDGET GET - ", block.id );
 
                     widgets[ block.id ] = json.html;
 
