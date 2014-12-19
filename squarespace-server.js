@@ -29,14 +29,16 @@ var _ = require( "underscore" ),
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
     directories = {},
-    config = null,
+    templateConfig = null,
+    serverConfig = null,
+    templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
     packageJson = functions.readJson( path.join( __dirname, "package.json" ) ),
 
 
 /**
  *
- * config.server = {
+ * serverConfig = {
  *      siteurl,
  *      port,
  *      webroot,
@@ -47,38 +49,55 @@ var _ = require( "underscore" ),
  * };
  *
  * @method setServerConfig
+ * @param {object} conf The parsed template.conf
  * @private
  *
  */
-setServerConfig = function () {
-    // @global - config
-    config.server.siteurl = config.server.siteurl.replace( rSlash, "" );
-    config.server.port = (config.server.port || 5050);
-    config.server.webroot = process.cwd();
-    config.server.protocol = config.server.siteurl.match( rProtocol )[ 0 ];
-    config.server.siteData = {};
+setServerConfig = function ( conf ) {
+    serverConfig = conf.server;
 
-    if ( !config.server.cacheroot ) {
-        config.server.cacheroot = path.join( config.server.webroot, ".sqs-cache" );
+    serverConfig.siteurl = serverConfig.siteurl.replace( rSlash, "" );
+    serverConfig.port = (serverConfig.port || 5050);
+    serverConfig.webroot = process.cwd();
+    serverConfig.protocol = serverConfig.siteurl.match( rProtocol )[ 0 ];
+    serverConfig.siteData = {};
 
-        if ( !fs.existsSync( config.server.cacheroot ) ) {
-            fs.mkdirSync( config.server.cacheroot );
+    if ( !serverConfig.cacheroot ) {
+        serverConfig.cacheroot = path.join( serverConfig.webroot, ".sqs-cache" );
+
+        if ( !fs.existsSync( serverConfig.cacheroot ) ) {
+            fs.mkdirSync( serverConfig.cacheroot );
         }
     }
 
     // Set config for middleware
-    sqsMiddleware.set( "siteurl", config.server.siteurl );
+    sqsMiddleware.set( "siteurl", serverConfig.siteurl );
 
-    if ( config.server.password ) {
-        sqsMiddleware.set( "sitepassword", config.server.password );
+    if ( serverConfig.password ) {
+        sqsMiddleware.set( "sitepassword", serverConfig.password );
     }
 
-    if ( config.server.sandbox ) {
+    if ( serverConfig.sandbox ) {
         sqsMiddleware.set( "sandboxmode", true );
     }
 
-    // Set config on external modules
-    sqsTemplate.setConfig( config );
+    sqsTemplate.setConfig( "server", serverConfig );
+},
+
+
+/**
+ *
+ * @method setTemplateConfig
+ * @param {object} conf The parsed template.conf
+ * @private
+ *
+ */
+setTemplateConfig = function ( conf ) {
+    templateConfig = conf;
+
+    delete setTemplateConfig.server;
+
+    sqsTemplate.setConfig( "template", templateConfig );
 },
 
 
@@ -92,12 +111,12 @@ setServerConfig = function () {
 setDirectories = function () {
     // @global - directories
     directories = {
-        blocks: path.join( config.server.webroot, "blocks" ),
-        collections: path.join( config.server.webroot, "collections" ),
-        assets: path.join( config.server.webroot, "assets" ),
-        pages: path.join( config.server.webroot, "pages" ),
-        scripts: path.join( config.server.webroot, "scripts" ),
-        styles: path.join( config.server.webroot, "styles" )
+        blocks: path.join( serverConfig.webroot, "blocks" ),
+        collections: path.join( serverConfig.webroot, "collections" ),
+        assets: path.join( serverConfig.webroot, "assets" ),
+        pages: path.join( serverConfig.webroot, "pages" ),
+        scripts: path.join( serverConfig.webroot, "scripts" ),
+        styles: path.join( serverConfig.webroot, "styles" )
     };
 
     // Set directories on external modules
@@ -134,12 +153,12 @@ renderResponse = function ( appRequest, appResponse ) {
         }
     }
 
-    cacheHtml = path.join( config.server.cacheroot, (cacheName + ".html") );
-    cacheJson = path.join( config.server.cacheroot, (cacheName + ".json") );
+    cacheHtml = path.join( serverConfig.cacheroot, (cacheName + ".html") );
+    cacheJson = path.join( serverConfig.cacheroot, (cacheName + ".json") );
 
     // JSON cache?
     if ( fs.existsSync( cacheJson ) ) {
-        cacheJson = functions.readJson( path.join( config.server.cacheroot, (cacheName + ".json") ) );
+        cacheJson = functions.readJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ) );
 
     } else {
         cacheJson = null;
@@ -147,7 +166,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
     // HTML cache?
     if ( fs.existsSync( cacheHtml ) ) {
-        cacheHtml = functions.readFileSquashed( path.join( config.server.cacheroot, (cacheName + ".html") ) );
+        cacheHtml = functions.readFileSquashed( path.join( serverConfig.cacheroot, (cacheName + ".html") ) );
 
     } else {
         cacheHtml = null;
@@ -182,7 +201,7 @@ renderResponse = function ( appRequest, appResponse ) {
         } else {
             sqsMiddleware.getJson( url, qrs, function ( error, json ) {
                 if ( !error ) {
-                    functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), json );
+                    functions.writeJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ), json );
 
                     appResponse.status( 200 ).json( json );
 
@@ -205,8 +224,8 @@ renderResponse = function ( appRequest, appResponse ) {
                     return;
                 }
 
-                functions.writeJson( path.join( config.server.cacheroot, (cacheName + ".json") ), data.json.json );
-                functions.writeFile( path.join( config.server.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
+                functions.writeJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ), data.json.json );
+                functions.writeFile( path.join( serverConfig.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
 
                 sqsTemplate.renderTemplate( qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
                     appResponse.status( 200 ).send( tpl );
@@ -241,7 +260,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Favicon / Universal Image
     if ( rIco.test( appRequest.params[ 0 ] ) || rUniversal.test( appRequest.params[ 0 ] ) ) {
-        appResponse.redirect( (config.server.siteurl + appRequest.params[ 0 ]) );
+        appResponse.redirect( (serverConfig.siteurl + appRequest.params[ 0 ]) );
 
         return;
     }
@@ -250,7 +269,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "config" ) {
         functions.log( "CONFIG - Author your content!" );
 
-        appResponse.redirect( (config.server.siteurl + "/config/") );
+        appResponse.redirect( (serverConfig.siteurl + "/config/") );
 
         return;
     }
@@ -286,6 +305,9 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Log URI
     functions.log( "GET - " + appRequest.params[ 0 ] );
+
+    // Update the template config for all requests, reloads stylesheets etc...
+    setTemplateConfig( functions.readJson( templateConfigPath ) );
 
     // Run the template compiler
     sqsTemplate.setSQSHeadersFooters();
@@ -341,10 +363,10 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
             sqsMiddleware.getAPIData( function ( error, data ) {
                 if ( !error ) {
                     // Store the site data needed
-                    config.server.siteData = data;
+                    serverConfig.siteData = data;
 
                     // Set config on external modules
-                    sqsTemplate.setConfig( config );
+                    sqsTemplate.setConfig( "server", serverConfig );
 
                     // Store time of login
                     sqsTimeOfLogin = Date.now();
@@ -431,13 +453,13 @@ processArguments = function ( args ) {
         process.exit();
 
     } else if ( commands.buster ) {
-        fse.removeSync( path.join( config.server.cacheroot ) );
+        fse.removeSync( path.join( serverConfig.cacheroot ) );
         functions.log( "Trashed your local .sqs-cache." );
         process.exit();
 
     } else if ( commands.server ) {
         if ( flags.port ) {
-            config.server.port = flags.port;
+            serverConfig.port = flags.port;
         }
 
         startServer();
@@ -453,10 +475,10 @@ processArguments = function ( args ) {
  */
 startServer = function () {
     // Create express application
-    expressApp.use( express.static( config.server.webroot ) );
+    expressApp.use( express.static( serverConfig.webroot ) );
     expressApp.use( bodyParser.json() );
     expressApp.use( bodyParser.urlencoded( {extended: true} ) );
-    expressApp.set( "port", config.server.port );
+    expressApp.set( "port", serverConfig.port );
     expressApp.get( "*", onExpressRouterGET );
     expressApp.post( "/", onExpressRouterPOST );
     expressApp.listen( expressApp.get( "port" ) );
@@ -479,11 +501,11 @@ module.exports = {
      *
      */
     init: function ( conf, args ) {
-        // Create global config
-        config = conf;
+        // Create global serverConfig
+        setServerConfig( conf );
 
-        // Create global config.server
-        setServerConfig();
+        // Create global templateConfig
+        setTemplateConfig( conf );
 
         // Create global directories
         setDirectories();
