@@ -1,8 +1,10 @@
-<div class="sqs-layout sqs-grid-{{data.layout.columns}} columns-{{data.layout.columns}}{{#attrs.locked-layout}} sqs-locked-layout{{/attrs.locked-layout}}" data-type="block-field" data-updated-on="{{data.updatedOn}}" id="{{attrs.id}}">
+<div class="sqs-layout sqs-grid-{{data.layout.columns}} columns-{{data.layout.columns}}{{#attrs.locked-layout}} sqs-locked-layout{{/attrs.locked-layout}}" {{#attrs.label}}data-layout-label="{{attrs.label}}"{{/attrs.label}} data-type="block-field" data-updated-on="{{data.updatedOn}}" id="{{attrs.id}}">
     {{#data.layout.rows}}
         <div class="row sqs-row">
             {{#columns}}
-                <div class="col sqs-col-{{attrs.columns}} span-{{span}}">
+                <div class="col sqs-col-{{span}} span-{{span}}">
+                {{^rows}}
+                    <!-- Column has no rows, just blocks -->
                     {{#blocks}}
                         <div class="sqs-block {{typeName}}-block sqs-block-{{typeName}}" data-block-type="{{type}}" id="block-{{id}}" data-block-json="{{{blockJson}}}">
                             <div class="sqs-block-content">
@@ -10,6 +12,23 @@
                             </div>
                         </div>
                     {{/blocks}}
+                {{/rows}}
+                {{#rows}}
+                    <!-- Column has rows, multi-column blocks -->
+                    <div class="row sqs-row">
+                    {{#columns}}
+                        <div class="col sqs-col-{{span}} span-{{span}}">
+                            {{#blocks}}
+                                <div class="sqs-block {{typeName}}-block sqs-block-{{typeName}}" data-block-type="{{type}}" id="block-{{id}}" data-block-json="{{{blockJson}}}">
+                                    <div class="sqs-block-content">
+                                        {{{widgetHtml}}}
+                                    </div>
+                                </div>
+                            {{/blocks}}
+                        </div>
+                    {{/columns}}
+                    </div>
+                {{/rows}}
                 </div>
             {{/columns}}
         </div>

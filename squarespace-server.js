@@ -124,11 +124,6 @@ renderResponse = function ( appRequest, appResponse ) {
 
     cacheName = ("page-" + reqSlug);
 
-    // Password?
-    //if ( config.server.password ) {
-    //    qrs.password = config.server.password;
-    //}
-
     // Querystring?
     for ( var i in appRequest.query ) {
         qrs[ i ] = appRequest.query[ i ];
@@ -237,6 +232,8 @@ renderResponse = function ( appRequest, appResponse ) {
 onExpressRouterGET = function ( appRequest, appResponse ) {
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
+        functions.log( "API DENY - " + appRequest.params[ 0 ] );
+
         appResponse.end();
 
         return;
