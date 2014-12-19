@@ -440,6 +440,8 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             }
 
             sqsMiddleware.getQuery( queryData, qrs, function ( error, json ) {
+                functions.log( "QUERY - " + queryData.collection );
+
                 if ( !error ) {
                     functions.writeJson( cacheSlug, json );
 
@@ -451,6 +453,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
                 } else {
                     // Handle errors
+                    functions.log( "ERROR - " + error );
                 }
             });
         }
@@ -725,15 +728,23 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
         widgets = {},
         blocks = [],
         r,
+        r2,
         rLen,
+        rLen2,
         c,
+        c2,
         cLen,
+        cLen2,
         b,
-        bLen;
+        b2,
+        bLen,
+        bLen2;
 
     if ( matched ) {
         function getWidget() {
             var block = blocks.shift();
+
+            console.log( "block", block );
 
             sqsMiddleware.getWidgetHtml( block, function ( error, json ) {
                 var layout;
@@ -748,12 +759,33 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                             cLen = blockData.data.layout.rows[ r ].columns.length;
 
                             for ( c = 0; c < cLen; c++ ) {
-                                bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
+                                // Check layout, we need to account for multi-column
+                                // This is where it breaks the mold of single column
+                                if ( blockData.data.layout.rows[ r ].columns[ c ].rows ) {
+                                    rLen2 = blockData.data.layout.rows[ r ].columns[ c ].rows.length;
 
-                                for ( b = 0; b < bLen; b++ ) {
-                                    blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].value ).replace( /"/g, "&quot;" );
-                                    blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].typeName = getBlockTypeName( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].type );
-                                    blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].widgetHtml = widgets[ blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].id ];
+                                    for ( r2 = 0; r2 < rLen2; r2++ ) {
+                                        cLen2 = blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns.length;
+
+                                        for ( c2 = 0; c2 < cLen2; c2++ ) {
+                                            bLen2 = blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks.length;
+
+                                            for ( b2 = 0; b2 < bLen2; b2++ ) {
+                                                blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ].value ).replace( /"/g, "&quot;" );
+                                                blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ].typeName = getBlockTypeName( blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ].type );
+                                                blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ].widgetHtml = widgets[ blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ].id ];
+                                            }
+                                        }
+                                    }
+
+                                } else {
+                                    bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
+
+                                    for ( b = 0; b < bLen; b++ ) {
+                                        blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].blockJson = JSON.stringify( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].value ).replace( /"/g, "&quot;" );
+                                        blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].typeName = getBlockTypeName( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].type );
+                                        blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].widgetHtml = widgets[ blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ].id ];
+                                    }
                                 }
                             }
                         }
@@ -780,6 +812,20 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 } else {
                     // Handle errors
+                    functions.log( "ERROR - " + error );
+
+                    // Skip it for now...
+                    if ( !blocks.length ) {
+                        if ( !matched.length ) {
+                            callback( rendered );
+
+                        } else {
+                            getBlocks();
+                        }
+
+                    } else {
+                        getWidget();
+                    }
                 }
             });
         }
@@ -824,10 +870,29 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                             cLen = blockData.data.layout.rows[ r ].columns.length;
 
                             for ( c = 0; c < cLen; c++ ) {
-                                bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
+                                // Check layout, we need to account for multi-column
+                                // This is where it breaks the mold of single column
+                                if ( blockData.data.layout.rows[ r ].columns[ c ].rows ) {
+                                    rLen2 = blockData.data.layout.rows[ r ].columns[ c ].rows.length;
 
-                                for ( b = 0; b < bLen; b++ ) {
-                                    blocks.push( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ] );
+                                    for ( r2 = 0; r2 < rLen2; r2++ ) {
+                                        cLen2 = blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns.length;
+
+                                        for ( c2 = 0; c2 < cLen2; c2++ ) {
+                                            bLen2 = blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks.length;
+
+                                            for ( b2 = 0; b2 < bLen2; b2++ ) {
+                                                blocks.push( blockData.data.layout.rows[ r ].columns[ c ].rows[ r2 ].columns[ c2 ].blocks[ b2 ] );
+                                            }
+                                        }
+                                    }
+
+                                } else {
+                                    bLen = blockData.data.layout.rows[ r ].columns[ c ].blocks.length;
+
+                                    for ( b = 0; b < bLen; b++ ) {
+                                        blocks.push( blockData.data.layout.rows[ r ].columns[ c ].blocks[ b ] );
+                                    }
                                 }
                             }
                         }
