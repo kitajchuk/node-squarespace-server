@@ -44,7 +44,7 @@ var _ = require( "underscore" ),
     sqsFooters = [],
     sqsUser = null,
     directories = {},
-    config = null,
+    config = {},
     scripts = [],
     siteCss = null,
     templates = {},
@@ -61,8 +61,8 @@ var _ = require( "underscore" ),
  * @public
  *
  */
-setConfig = function ( conf ) {
-    config = conf;
+setConfig = function ( key, conf ) {
+    config[ key ] = conf;
 },
 
 
@@ -145,8 +145,8 @@ compileRegions = function () {
         file = null,
         link = null;
 
-    for ( var i in config.layouts ) {
-        files = config.layouts[ i ].regions;
+    for ( var i in config.template.layouts ) {
+        files = config.template.layouts[ i ].regions;
         file = "";
         link = (i + ".region");
 
@@ -484,10 +484,12 @@ compileStylesheets = function ( callback ) {
 
     if ( fs.existsSync( reset ) ) {
         siteCss += uglifycss.processString( functions.readFileSquashed( reset ) );
+
+        functions.log( "CSS - reset" );
     }
 
-    for ( var i = 0, len = config.stylesheets.length; i < len; i++ ) {
-        fpath = path.join( directories.styles, config.stylesheets[ i ] );
+    for ( var i = 0, len = config.template.stylesheets.length; i < len; i++ ) {
+        fpath = path.join( directories.styles, config.template.stylesheets[ i ] );
 
         if ( !fs.existsSync( fpath ) ) {
             continue;
@@ -495,17 +497,17 @@ compileStylesheets = function ( callback ) {
 
         file = ("" + fs.readFileSync( fpath ));
 
-        if ( rLess.test( config.stylesheets[ i ] ) ) {
+        if ( rLess.test( config.template.stylesheets[ i ] ) ) {
             less.render( file, function ( error, css ) {
                 siteCss += css;
             });
 
-            functions.log( ("LESS - " + config.stylesheets[ i ]) );
+            functions.log( ("LESS - " + config.template.stylesheets[ i ]) );
 
         } else {
             siteCss += uglifycss.processString( file );
 
-            functions.log( ("CSS - " + config.stylesheets[ i ]) );
+            functions.log( ("CSS - " + config.template.stylesheets[ i ]) );
         }
     }
 
@@ -574,7 +576,7 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
                 'Squarespace.isWrappedForDamask=function(){return true;};Squarespace.load(window);'
             );
         }
-        siteStyleTag = '<!-- ' + config.name + ' Local Styles --><style type="text/css">' + siteCss + '</style>';
+        siteStyleTag = '<!-- ' + config.template.name + ' Local Styles --><style type="text/css">' + siteCss + '</style>';
         sHeadersFull += siteStyleTag;
         sqsHeaders.push( tokenHeadersFull );
         scripts.push({
