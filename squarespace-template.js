@@ -689,9 +689,6 @@ replaceNavigations = function ( rendered, pageJson ) {
                 }
             }
 
-            console.log( context.items );
-            console.log( "" );
-
             template = sqsRender.renderJsonTemplate( template, context );
 
             rendered = rendered.replace( matched[ i ], template );
