@@ -626,7 +626,9 @@ replaceNavigations = function ( rendered, pageJson ) {
         iLen,
         j,
         k,
-        kLen;
+        kLen,
+        l,
+        lLen;
 
     // SQS Navigations
     matched = rendered.match( rSQSNavis );
@@ -638,23 +640,49 @@ replaceNavigations = function ( rendered, pageJson ) {
             template = functions.readFileSquashed( path.join( directories.blocks, block ) );
 
             for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
+                // Ensure the identifier is for THIS navigation ID
                 if ( config.server.siteData.siteLayout.layout[ j ].identifier === attrs.navigationId ) {
                     items = [];
 
                     for ( k = 0, kLen = config.server.siteData.siteLayout.layout[ j ].links.length; k < kLen; k++ ) {
-                        if ( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId ) {
-                            items.push({
-                                active: (config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId === pageJson.collection.id),
-                                folderActive: (config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId === pageJson.collection.id),
-                                collection: lookupCollection( config.server.siteData.siteLayout.layout[ j ].links[ k ].collectionId )
-                            });
+                        var link = config.server.siteData.siteLayout.layout[ j ].links[ k ],
+                            item = null;
+
+                        // Render item with a collection ID
+                        if ( link.collectionId ) {
+                            item = {
+                                active: (link.collectionId === pageJson.collection.id),
+                                folderActive: (link.collectionId === pageJson.collection.id),
+                                collection: lookupCollection( link.collectionId )
+                            };
+
+                            // Check for folder submenu items
+                            if ( link.children ) {
+                                item.items = [];
+
+                                for ( l = 0, lLen = link.children.length; l < lLen; l++ ) {
+                                    item.items.push({
+                                        active: (link.children[ l ].collectionId === pageJson.collection.id),
+                                        folderActive: (link.children[ l ].collectionId === pageJson.collection.id),
+                                        collection: lookupCollection( link.children[ l ].collectionId )
+                                    });
+
+                                    // Need active folder when collection in a folder is active
+                                    if ( link.children[ l ].collectionId === pageJson.collection.id ) {
+                                        item.active = (link.children[ l ].collectionId === pageJson.collection.id);
+                                        item.folderActive = (link.children[ l ].collectionId === pageJson.collection.id);
+                                    }
+                                }
+                            }
 
                         } else {
-                            items.push( _.extend( config.server.siteData.siteLayout.layout[ j ].links[ k ], {
-                                active: (config.server.siteData.siteLayout.layout[ j ].links[ k ].title === pageJson.collection.title),
-                                folderActive: (config.server.siteData.siteLayout.layout[ j ].links[ k ].title === pageJson.collection.title)
-                            }));
+                            item = _.extend( link, {
+                                active: (link.title === pageJson.collection.title),
+                                folderActive: (link.title === pageJson.collection.title)
+                            });
                         }
+
+                        items.push( item );
                     }
 
                     context.items = items;
