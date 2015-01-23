@@ -242,6 +242,51 @@ renderResponse = function ( appRequest, appResponse ) {
 
 /**
  *
+ * @method getFolderRoot
+ * @param {string} uri The express request uri
+ * @returns {object}
+ * @private
+ *
+ */
+getFolderRoot = function ( uri ) {
+    var ret = {
+        folder: false,
+        redirect: false
+    };
+
+    uri = uri.replace( rSlash, "" );
+
+    for ( var i = serverConfig.siteData.siteLayout.layout.length; i--; ) {
+        var layout = serverConfig.siteData.siteLayout.layout[ i ];
+
+        // Break out if folder matched
+        if ( ret.folder ) {
+            break;
+        }
+
+        // Skip hidden navigations
+        if ( layout.identifier === "_hidden" ) {
+            continue;
+        }
+
+        for ( var j = layout.links.length; j--; ) {
+            var link = layout.links[ j ];
+
+            // Matched a root level folder uri request
+            if ( link.typeName === "folders" && link.urlId === uri ) {
+                ret.folder = true;
+                ret.redirect = ("/" + link.children[ 0 ].urlId + "/");
+                break;
+            }
+        }
+    }
+
+    return ret;
+},
+
+
+/**
+ *
  * @method onExpressRouterGET
  * @param {object} appRequest The express request
  * @param {object} appResponse The express response
@@ -249,6 +294,8 @@ renderResponse = function ( appRequest, appResponse ) {
  *
  */
 onExpressRouterGET = function ( appRequest, appResponse ) {
+    var checkFolder;
+
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
         functions.log( "API DENY - " + appRequest.params[ 0 ] );
@@ -299,6 +346,17 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
         functions.log( "AUTH EXPIRED - Logout of Squarespace!" );
 
         appResponse.redirect( "/logout" );
+
+        return;
+    }
+
+    // Top level folder
+    checkFolder = getFolderRoot( appRequest.params[ 0 ] );
+
+    if ( checkFolder.folder ) {
+        functions.log( "FOLDER ROOT - " + appRequest.params[ 0 ] );
+
+        appResponse.redirect( checkFolder.redirect );
 
         return;
     }
