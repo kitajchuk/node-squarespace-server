@@ -201,9 +201,9 @@ renderResponse = function ( appRequest, appResponse ) {
         } else {
             sqsMiddleware.getJson( url, qrs, function ( error, json ) {
                 if ( !error ) {
-                    functions.writeJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ), json );
+                    functions.writeJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ), json.json );
 
-                    appResponse.status( 200 ).json( json );
+                    appResponse.status( 200 ).json( json.json );
 
                 } else {
                     // Handle errors
