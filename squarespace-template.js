@@ -93,6 +93,18 @@ setUser = function ( user ) {
 
 /**
  *
+ * @method getSiteCss
+ * @returns {string} compiled css
+ * @public
+ *
+ */
+getSiteCss = function () {
+    return siteCss;
+},
+
+
+/**
+ *
  * @method replaceSQSTags
  * @param {string} rendered The template rendering
  * @param {object} pageJson JSON data for page
@@ -476,11 +488,10 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 /**
  *
  * @method compileStylesheets
- * @param {function} callback Handle composition done
  * @public
  *
  */
-compileStylesheets = function ( callback ) {
+compileStylesheets = function () {
     var reset = path.join( directories.styles, "reset.css" ),
         fpath,
         file;
@@ -515,8 +526,6 @@ compileStylesheets = function ( callback ) {
             functions.log( ("CSS - " + config.template.stylesheets[ i ]) );
         }
     }
-
-    return callback;
 },
 
 
@@ -527,6 +536,7 @@ compileStylesheets = function ( callback ) {
  *
  */
 setSQSHeadersFooters = function () {
+    scripts = [];
     sqsHeaders = [];
     sqsFooters = [];
 },
@@ -568,25 +578,32 @@ setHeaderFooter = function () {
 setHeaderFooterTokens = function ( pageJson, pageHtml ) {
     var tokenHeadersFull = functions.getToken(),
         tokenFootersFull = functions.getToken(),
+        tokenStyleTag = functions.getToken(),
         sHeadersFull = pageHtml.match( rSQSHeadersFull ),
         sFootersFull = pageHtml.match( rSQSFootersFull ),
         siteStyleTag = null;
 
     // Headers?
     if ( sHeadersFull ) {
+        sHeadersFull = sHeadersFull[ 0 ];
+
         // Override isWrappedForDamask to ensure public site loads
         if ( config.server.sandbox ) {
-            sHeadersFull = sHeadersFull[ 0 ].replace(
+            sHeadersFull = sHeadersFull.replace(
                 'Squarespace.load(window);',
                 'Squarespace.isWrappedForDamask=function(){return true;};Squarespace.load(window);'
             );
         }
-        siteStyleTag = '<!-- ' + config.template.name + ' Local Styles --><style type="text/css">' + siteCss + '</style>';
-        sHeadersFull += siteStyleTag;
         sqsHeaders.push( tokenHeadersFull );
         scripts.push({
             token: tokenHeadersFull,
             script: sHeadersFull
+        });
+
+        sqsHeaders.push( tokenStyleTag );
+        scripts.push({
+            token: tokenStyleTag,
+            script: '<link href="/site.css" rel="stylesheet" />'
         });
     }
 
@@ -984,6 +1001,7 @@ module.exports = {
     setConfig: setConfig,
     setDirs: setDirs,
     setUser: setUser,
+    getSiteCss: getSiteCss,
     compileCollections: compileCollections,
     compileRegions: compileRegions,
     replaceBlocks: replaceBlocks,

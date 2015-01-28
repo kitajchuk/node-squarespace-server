@@ -296,6 +296,15 @@ getFolderRoot = function ( uri ) {
 onExpressRouterGET = function ( appRequest, appResponse ) {
     var checkFolder;
 
+    // Site CSS
+    if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
+        functions.log( "SITE CSS - " + appRequest.params[ 0 ] );
+
+        appResponse.status( 200 ).send( sqsTemplate.getSiteCss() );
+
+        return;
+    }
+
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
         functions.log( "API DENY - " + appRequest.params[ 0 ] );
