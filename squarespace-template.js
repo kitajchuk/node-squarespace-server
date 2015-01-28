@@ -934,7 +934,14 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                     } else {
                         // Handle errors
-                        getBlocks();
+                        functions.log( "ERROR - " + error );
+
+                        if ( !matched.length ) {
+                            callback( rendered );
+
+                        } else {
+                            getBlocks();
+                        }
                     }
                 });
             }
