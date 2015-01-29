@@ -300,7 +300,10 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
         functions.log( "SITE CSS - " + appRequest.params[ 0 ] );
 
-        appResponse.status( 200 ).send( sqsTemplate.getSiteCss() );
+        // Always serve fresh styles
+        sqsTemplate.compileStylesheets();
+
+        appResponse.set( "Content-Type", "text/css" ).status( 200 ).send( sqsTemplate.getSiteCss() );
 
         return;
     }
@@ -384,7 +387,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     sqsTemplate.replaceBlocks();
     sqsTemplate.replaceScripts();
     sqsTemplate.replaceSQSScripts();
-    sqsTemplate.compileStylesheets();
 
     // Render the response
     renderResponse( appRequest, appResponse );
