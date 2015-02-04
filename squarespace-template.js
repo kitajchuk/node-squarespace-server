@@ -12,7 +12,7 @@ var _ = require( "underscore" ),
     sqsMiddleware = require( "node-squarespace-middleware" ),
     functions = require( "./lib/functions" ),
     blocktypes = require( "./lib/blocktypes" ),
-    sqsRender = require( "./squarespace-render" ),
+    sqsJsonTemplate = require( "node-squarespace-jsont" ),
     rSlash = /^\/|\/$/g,
     rJsonT = /^\{.*?\}$/,
     rHeader = /header/,
@@ -387,7 +387,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         rendered = replaceClickThroughUrls( rendered );
 
         // Render w/jsontemplate
-        rendered = sqsRender.renderJsonTemplate( rendered, pageJson );
+        rendered = sqsJsonTemplate.render( rendered, pageJson );
 
         // Add token scripts back into the template
         for ( var i = scripts.length; i--; ) {
@@ -415,7 +415,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         if ( jsonTMatch ) {
             jsonTMatch = jsonTMatch[ 0 ];
 
-            queryData.collection = sqsRender.renderJsonTemplate( jsonTMatch, pageJson );
+            queryData.collection = sqsJsonTemplate.render( jsonTMatch, pageJson );
         }
 
         cacheSlug = ("query-" + queryData.collection);
@@ -445,7 +445,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
             json = functions.readJson( cacheSlug );
 
-            tpl = sqsRender.renderJsonTemplate( query[ 2 ], json );
+            tpl = sqsJsonTemplate.render( query[ 2 ], json );
 
             rendered = rendered.replace( query[ 2 ], tpl );
 
@@ -462,7 +462,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
                 if ( !error ) {
                     functions.writeJson( cacheSlug, json );
 
-                    tpl = sqsRender.renderJsonTemplate( query[ 2 ], json );
+                    tpl = sqsJsonTemplate.render( query[ 2 ], json );
 
                     rendered = rendered.replace( query[ 2 ], tpl );
 
@@ -706,7 +706,7 @@ replaceNavigations = function ( rendered, pageJson ) {
                 }
             }
 
-            template = sqsRender.renderJsonTemplate( template, context );
+            template = sqsJsonTemplate.render( template, context );
 
             rendered = rendered.replace( matched[ i ], template );
         }
