@@ -509,7 +509,7 @@ processArguments = function ( args ) {
 
         if ( rFlag.test( arg ) ) {
             split = arg.split( "=" );
-            flags[ split[ 0 ].replace( rFlag, "" ) ] = (split[ 1 ] || undefined);
+            flags[ split[ 0 ].replace( rFlag, "" ) ] = (split[ 1 ] || true);
 
         } else {
             commands[ arg ] = true;
