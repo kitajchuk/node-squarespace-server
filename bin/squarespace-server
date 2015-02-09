@@ -10,12 +10,17 @@ var fs = require( "fs" ),
     forever = path.join( __dirname, "../", "node_modules", "forever", "bin", "forever" ),
     startup = path.join( __dirname, "../squarespace-startup.js" )
     functions = require( "../lib/functions" ),
+    versionIdx = args.indexOf( "--version" ),
     foreverIdx = args.indexOf( "--forever" ),
     forneverIdx = args.indexOf( "--fornever" );
 
 
+// Print package version
+if ( versionIdx !== -1 ) {
+    server.printv();
+
 // Warn and stop or print usage if no template.conf
-if ( !fs.existsSync( config ) ) {
+} else if ( !fs.existsSync( config )  ) {
     if ( args.length ) {
         functions.log( "Required template.conf not found" );
 

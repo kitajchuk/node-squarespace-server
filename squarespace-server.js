@@ -490,6 +490,18 @@ printUsage = function () {
 
 /**
  *
+ * @method printUsage
+ * @private
+ *
+ */
+printVersion = function () {
+    functions.log( packageJson.version );
+    process.exit();
+},
+
+
+/**
+ *
  * @method processArguments
  * @param {object} args The arguments array
  * @private
@@ -589,5 +601,7 @@ module.exports = {
      * @public
      *
      */
-    print: printUsage
+    print: printUsage,
+
+    printv: printVersion
 };
