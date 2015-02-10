@@ -294,7 +294,8 @@ getFolderRoot = function ( uri ) {
  *
  */
 onExpressRouterGET = function ( appRequest, appResponse ) {
-    var checkFolder;
+    var checkFolder,
+        apiQuery;
 
     // Site CSS
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
@@ -310,9 +311,16 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
-        functions.log( "API DENY - " + appRequest.params[ 0 ] );
+        functions.log( "API - " + appRequest.params[ 0 ] );
 
-        appResponse.end();
+        apiQuery = appRequest.query;
+        apiQuery.crumb = sqsMiddleware.getCrumb();
+
+        sqsMiddleware.getJson( appRequest.params[ 0 ], apiQuery, function ( error, data ) {
+            if ( !error ) {
+                appResponse.set( "Content-Type", "application/json" ).status( data.status ).send( data.json );
+            }
+        });
 
         return;
     }
@@ -426,7 +434,7 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
     sqsTemplate.setUser( sqsUser );
 
     // Login to site
-    sqsMiddleware.doLogin(function ( error ) {
+    sqsMiddleware.doLogin(function ( error, headers ) {
         if ( !error ) {
             // Fetch site API data
             sqsMiddleware.getAPIData( function ( error, data ) {
@@ -603,5 +611,11 @@ module.exports = {
      */
     print: printUsage,
 
+    /**
+     *
+     * @method printv
+     * @public
+     *
+     */
     printv: printVersion
 };
