@@ -33,7 +33,7 @@ var _ = require( "underscore" ),
     rSQSBlockFields = /<squarespace:block-field(.*?)\/\>/g,
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
     rSQSClickThroughUrl = /\/s\/(.*?)\.\w+.*?/g,
-    rSQSFootersFull = /<script type="text\/javascript" data-sqs-type="imageloader-bootstraper"\>(.*)<\/script\>/,
+    rSQSFootersFull = /<script type="text\/javascript" data-sqs-type="imageloader-bootstraper"\>(.*?)(Squarespace\.afterBodyLoad\(Y\);)<\/script\>/,
     rSQSHeadersFull = /<\!-- This is Squarespace\. -->(.*?)<\!-- End of Squarespace Headers -->/,
     SQS_HEADERS = "{squarespace-headers}",
     SQS_FOOTERS = "{squarespace-footers}",
@@ -609,6 +609,7 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
 
     // Footers?
     if ( sFootersFull ) {
+        console.log( sFootersFull[ 0 ] );
         sqsFooters.push( tokenFootersFull );
         scripts.push({
             token: tokenFootersFull,
