@@ -609,7 +609,6 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
 
     // Footers?
     if ( sFootersFull ) {
-        console.log( sFootersFull[ 0 ] );
         sqsFooters.push( tokenFootersFull );
         scripts.push({
             token: tokenFootersFull,
