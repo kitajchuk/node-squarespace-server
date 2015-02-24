@@ -39,7 +39,7 @@ var _ = require( "underscore" ),
     SQS_FOOTERS = "{squarespace-footers}",
     SQS_MAIN_CONTENT = "{squarespace.main-content}",
     SQS_PAGE_CLASSES = "{squarespace.page-classes}",
-    SQS_PAGE_ID = "{squarespace.page-id}",
+    SQS_PAGE_ID = /\{squarespace\.page-id\}|squarespace\.page-id/g,
     SQS_POST_ENTRY = "{squarespace-post-entry}",
     sqsHeaders = [],
     sqsFooters = [],
@@ -121,9 +121,7 @@ replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
     rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
     rendered = rendered.replace( SQS_PAGE_CLASSES, bodyAttr.class );
-
-    // In case fools be using this #id more than once, WTF :-P
-    rendered = rendered.replace( new RegExp( SQS_PAGE_ID, "g" ), (pageType + "-" + pageId) );
+    rendered = rendered.replace( SQS_PAGE_ID, (pageType + "-" + pageId) );
 
     return rendered;
 },
