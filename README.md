@@ -78,6 +78,14 @@ sqs buster
 This runs the [express](http://expressjs.com) server on the relevant port. The default is `localhost:5050`.
 
 
+### Troubleshooting
+These are the most common causes for issues running the server and how to resolve them.
+
+- Make sure you use the `https` protocol for your siteurl.
+- Make sure you use the `"sandbox": true` setting in your template.conf if using an account in trial mode.
+- Bust your local cache and rerun the server if getting the error `TypeError: Cannot read property 'typeName' of undefined`. This is usually a result of running the server on a trial mode account without the `"sandbox": true` setting. The app caches "undefined" locally as it cannot access your site. Adding the setting to template.conf fixes the issue, but you still need to clear your local cache to get going again. Use `sqs buster` to achieve this.
+
+
 
 ### Middleware
 This uses the [node-squarespace-middleware](https://github.com/kitajchuk/node-squarespace-middleware) to interface with your Squarespace site.
