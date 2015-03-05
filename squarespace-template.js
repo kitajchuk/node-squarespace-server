@@ -29,6 +29,7 @@ var _ = require( "underscore" ),
     rJson = /\{@\|json.*?\}/,
     rBodyTag = /<body.*?\>/,
     rSQSQuery = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/,
+    rSQSQueryG = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/g,
     rSQSNavis = /<squarespace:navigation(.*?)\/\>/g,
     rSQSBlockFields = /<squarespace:block-field(.*?)\/\>/g,
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
@@ -328,11 +329,20 @@ getTemplateKey = function ( pageJson ) {
  *
  */
 renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
-    var queries = [],
+    var queries = {
+            raw: [],
+            processed: []
+        },
+        processedQueries = 0,
+        matched = null,
         templateKey = getTemplateKey( pageJson ),
         rendered = "",
-        matched = null,
-        regionKey;
+        regionKey,
+        len,
+        i;
+
+    // Create {squarespace-headers} / {squarespace-footers}
+    setHeaderFooterTokens( pageJson, pageHtml );
 
     if ( templates.__HEADER ) {
         rendered += templates.__HEADER;
@@ -354,41 +364,64 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         rendered += templates.__FOOTER;
     }
 
-    // SQS Tags?
+    // Pre-process Queries
+    matched = rendered.match( rSQSQueryG );
+
+    if ( matched ) {
+        for ( i = 0, len = matched.length; i < len; i++ ) {
+            var match = matched[ i ].match( rSQSQuery ),
+                token = functions.getToken();
+
+            rendered = rendered.replace( match[ 2 ], token );
+
+            queries.raw.push({
+                token: token,
+                template: match[ 2 ]
+            });
+        }
+    }
+
+    // Render squarespace tags like {squarespace.page-id} etc...
     rendered = replaceSQSTags( rendered, pageJson, pageHtml );
 
-    // Queries
-    // 0 => Full
-    // 1 => Open
-    // 2 => Template
-    // 3 => Close
-    while ( matched = rendered.match( rSQSQuery ) ) {
-        rendered = rendered.replace( matched[ 0 ], matched[ 2 ] );
+    // Render {squarespace-headers} to the best of our ability
+    rendered = rendered.replace( SQS_HEADERS, sqsHeaders.join( "" ) );
 
-        queries.push( matched );
+    // Render {squarespace-footers} to the best of our ability
+    rendered = rendered.replace( SQS_FOOTERS, sqsFooters.join( "" ) );
+
+    // Render Navigations from pageJson
+    rendered = replaceNavigations( rendered, pageJson );
+
+    // Render full clickThroughUrl's
+    rendered = replaceClickThroughUrls( rendered );
+
+    // Render page in full w/jsontemplate
+    rendered = sqsJsonTemplate.render( rendered, pageJson );
+
+    // Post-process Queries
+    matched = rendered.match( rSQSQueryG );
+
+    if ( matched ) {
+        for ( i = 0, len = matched.length; i < len; i++ ) {
+            var match = matched[ i ].match( rSQSQuery ),
+                token = match[ 2 ];
+
+            for ( var j = queries.raw.length; j--; ) {
+                if ( queries.raw[ j ].token === token ) {
+                    queries.processed.push({
+                        template: queries.raw[ j ].template,
+                        queryData: functions.getAttrObj( match[ 1 ] ),
+                        queryProcessed: match[ 0 ]
+                    });
+                }
+            }
+        }
     }
 
     function handleDone() {
-        // Create {squarespace-headers} / {squarespace-footers}
-        setHeaderFooterTokens( pageJson, pageHtml );
-
-        // Render {squarespace-headers} to the best of our ability
-        rendered = rendered.replace( SQS_HEADERS, sqsHeaders.join( "" ) );
-
-        // Render {squarespace-footers} to the best of our ability
-        rendered = rendered.replace( SQS_FOOTERS, sqsFooters.join( "" ) );
-
-        // Render Navigations from pageJson
-        rendered = replaceNavigations( rendered, pageJson );
-
-        // Render full clickThroughUrl's
-        rendered = replaceClickThroughUrls( rendered );
-
-        // Render w/jsontemplate
-        rendered = sqsJsonTemplate.render( rendered, pageJson );
-
         // Add token scripts back into the template
-        for ( var i = scripts.length; i--; ) {
+        for ( i = scripts.length; i--; ) {
             rendered = rendered.replace( scripts[ i ].token, scripts[ i ].script );
         }
 
@@ -399,26 +432,19 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     }
 
     function handleQueried() {
-        if ( !queries.length ) {
+        if ( processedQueries === queries.processed.length ) {
             handleDone();
             return;
         }
 
-        var query = queries.shift(),
-            queryData = functions.getAttrObj( query[ 1 ] ),
-            jsonTMatch = queryData.collection.match( rJsonT ),
+        var query = queries.processed[ processedQueries ],
             cacheSlug = "",
             tpl;
 
-        if ( jsonTMatch ) {
-            jsonTMatch = jsonTMatch[ 0 ];
+        processedQueries++;
+        cacheSlug = ("query-" + query.queryData.collection);
 
-            queryData.collection = sqsJsonTemplate.render( jsonTMatch, pageJson );
-        }
-
-        cacheSlug = ("query-" + queryData.collection);
-
-        for ( var i in qrs ) {
+        for ( i in qrs ) {
             // Skip password in unique cache
             if ( i !== "format" && i !== "password" && i !== "nocache" ) {
                 cacheSlug += ("-" + i + "--" + qrs[ i ]);
@@ -426,13 +452,13 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         }
 
         // Tag?
-        if ( queryData.tag ) {
-            cacheSlug += "-tag--" + queryData.tag;
+        if ( query.queryData.tag ) {
+            cacheSlug += "-tag--" + query.queryData.tag;
         }
 
         // Category?
-        if ( queryData.category ) {
-            cacheSlug += "-category--" + queryData.category;
+        if ( query.queryData.category ) {
+            cacheSlug += "-category--" + query.queryData.category;
         }
 
         cacheSlug = path.join( config.server.cacheroot, (cacheSlug + ".json") );
@@ -443,26 +469,26 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
             json = functions.readJson( cacheSlug );
 
-            tpl = sqsJsonTemplate.render( query[ 2 ], json );
+            tpl = sqsJsonTemplate.render( query.template, json );
 
-            rendered = rendered.replace( query[ 2 ], tpl );
+            rendered = rendered.replace( query.queryProcessed, tpl );
 
             handleQueried();
 
         } else {
             if ( qrs.nocache !== undefined ) {
-                functions.log( "CACHE - Clearing cached query: ", queryData.collection );
+                functions.log( "CACHE - Clearing cached query: ", query.queryData.collection );
             }
 
-            sqsMiddleware.getQuery( queryData, qrs, function ( error, json ) {
-                functions.log( "QUERY - " + queryData.collection );
+            sqsMiddleware.getQuery( query.queryData, qrs, function ( error, json ) {
+                functions.log( "QUERY - " + query.queryData.collection );
 
                 if ( !error ) {
                     functions.writeJson( cacheSlug, json );
 
-                    tpl = sqsJsonTemplate.render( query[ 2 ], json );
+                    tpl = sqsJsonTemplate.render( query.template, json );
 
-                    rendered = rendered.replace( query[ 2 ], tpl );
+                    rendered = rendered.replace( query.queryProcessed, tpl );
 
                     handleQueried();
 
@@ -474,7 +500,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         }
     }
 
-    if ( queries.length ) {
+    if ( queries.processed.length ) {
         handleQueried();
 
     } else {
