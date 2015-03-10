@@ -15,12 +15,10 @@ var _ = require( "underscore" ),
     sqsJsonTemplate = require( "node-squarespace-jsont" ),
     rSlash = /^\/|\/$/g,
     rJsonT = /^\{.*?\}$/,
-    rHeader = /header/,
-    rFooter = /footer/,
     rScripts = /<script.*?\>(.*?)<\/script\>/g,
     rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
     rBlockTags = /^\{\@\|apply\s|\}$/g,
-    rTplFiles = /\.item$|\.list$|\.region$|__HEADER$|__FOOTER$/,
+    rTplFiles = /\.item$|\.list$|\.region$/,
     rItemOrList = /\.item$|\.list$/,
     rRegions = /\.region$/,
     rItem = /\.item$/,
@@ -167,12 +165,7 @@ compileRegions = function () {
         link = (i + ".region");
 
         for ( j = 0, len = files.length; j < len; j++ ) {
-            // Skip header / footer regions since we parsed them earlier
-            // templates.__HEADER
-            // templates.__FOOTER
-            if ( !rHeader.test( files[ j ] ) && !rFooter.test( files[ j ] ) ) {
-                file += functions.readFileSquashed( path.join( config.server.webroot, (files[ j ] + ".region") ) );
-            }
+            file += functions.readFileSquashed( path.join( config.server.webroot, (files[ j ] + ".region") ) );
         }
 
         templates[ link ] = file;
@@ -344,12 +337,8 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     // Create {squarespace-headers} / {squarespace-footers}
     setHeaderFooterTokens( pageJson, pageHtml );
 
-    if ( templates.__HEADER ) {
-        rendered += templates.__HEADER;
-    }
-
     // 0.1 => Template is a list or item for a collection, NOT a region
-    // What we are doing here is replicating the injection point for {squarespace.main-content} on collections
+    // Injection point for {squarespace.main-content} AND add the site layout
     if ( rItemOrList.test( templateKey ) ) {
         regionKey = ((pageJson.collection.regionName || "default") + ".region");
 
@@ -358,10 +347,6 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
     } else {
         rendered += templates[ templateKey ];
-    }
-
-    if ( templates.__FOOTER ) {
-        rendered += templates.__FOOTER;
     }
 
     // Pre-process Queries
@@ -566,26 +551,6 @@ setSQSHeadersFooters = function () {
 },
 
 
-/**
- *
- * @method setHeaderFooter
- * @public
- *
- */
-setHeaderFooter = function () {
-    var files = fs.readdirSync( config.server.webroot );
-
-    for ( i = files.length; i--; ) {
-        if ( rRegions.test( files[ i ] ) && rHeader.test( files[ i ] ) ) {
-            templates.__HEADER = functions.readFileSquashed( path.join( config.server.webroot, files[ i ] ) );
-
-        } else if ( rRegions.test( files[ i ] ) && rFooter.test( files[ i ] ) ) {
-            templates.__FOOTER = functions.readFileSquashed( path.join( config.server.webroot, files[ i ] ) );
-        }
-    }
-},
-
-
 /******************************************************************************
  * @Private
 *******************************************************************************/
@@ -694,7 +659,7 @@ replaceNavigations = function ( rendered, pageJson ) {
                             item = {
                                 active: (link.collectionId === pageJson.collection.id),
                                 folderActive: (link.collectionId === pageJson.collection.id),
-                                collection: lookupCollection( link.collectionId )
+                                collection: lookupCollectionById( link.collectionId )
                             };
 
                             // Check for folder submenu items
@@ -705,7 +670,7 @@ replaceNavigations = function ( rendered, pageJson ) {
                                     item.items.push({
                                         active: (link.children[ l ].collectionId === pageJson.collection.id),
                                         folderActive: (link.children[ l ].collectionId === pageJson.collection.id),
-                                        collection: lookupCollection( link.children[ l ].collectionId )
+                                        collection: lookupCollectionById( link.children[ l ].collectionId )
                                     });
 
                                     // Need active folder when collection in a folder is active
@@ -998,13 +963,13 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
 /**
  *
- * @method lookupCollection
+ * @method lookupCollectionById
  * @param {string} id The collection ID
  * @returns {object}
  * @private
  *
  */
-lookupCollection = function ( id ) {
+lookupCollectionById = function ( id ) {
     var collection = null;
 
     for ( var i in config.server.siteData.collections.collections ) {
@@ -1034,6 +999,5 @@ module.exports = {
     getTemplateKey: getTemplateKey,
     renderTemplate: renderTemplate,
     compileStylesheets: compileStylesheets,
-    setSQSHeadersFooters: setSQSHeadersFooters,
-    setHeaderFooter: setHeaderFooter
+    setSQSHeadersFooters: setSQSHeadersFooters
 };

@@ -389,7 +389,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Run the template compiler
     sqsTemplate.setSQSHeadersFooters();
-    sqsTemplate.setHeaderFooter();
     sqsTemplate.compileCollections();
     sqsTemplate.compileRegions();
     sqsTemplate.replaceBlocks();
