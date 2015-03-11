@@ -20,6 +20,8 @@ var path = require( "path" ),
     rItem = /\.item$/,
     rList = /\.list$/,
     rLess = /\.less$/,
+    rCss = /\.css$/,
+    rBlock = /\.block$/,
     rJson = /\{@\|json.*?\}/,
     rBodyTag = /<body.*?\>/,
     rSQSQuery = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/,
@@ -43,7 +45,13 @@ var path = require( "path" ),
     config = {},
     scripts = [],
     siteCss = null,
-    templates = {},
+    templates = {
+        regions: {},
+        collections: {},
+        blocks: {}
+    },
+    layoutHTML = "",
+    updating = {},
 
     sqsMiddleware = require( "node-squarespace-middleware" ),
     sqsUtil = require( "./squarespace-util" ),
@@ -55,6 +63,111 @@ var path = require( "path" ),
 /******************************************************************************
  * @Public
 *******************************************************************************/
+
+/**
+ *
+ * @method load
+ * @public
+ *
+ */
+load = function () {
+    sqsUtil.readFile( path.join( __dirname, "tpl/layout.html" ), function ( data ) {
+        sqsUtil.log( "LOAD - Layout" );
+
+        layoutHTML = sqsUtil.packStr( data );
+    });
+},
+
+
+/**
+ *
+ * @method preload
+ * @param {function} cb The callback when loaded
+ * @public
+ *
+ */
+preload = function ( cb ) {
+    var compiled = 0;
+
+    function done() {
+        compiled++;
+
+        if ( compiled === 4 ) {
+            replaceAll();
+
+            cb();
+        }
+    }
+
+    compileBlocks( done );
+    compileRegions( done );
+    compileCollections( done );
+    compileStylesheets( done );
+},
+
+
+/**
+ *
+ * @method watch
+ * @public
+ *
+ */
+watch = function () {
+    function doneWatch( filename ) {
+        sqsUtil.log( ("WATCH - " + filename) );
+
+        replaceAll();
+
+        setTimeout( function () {
+            delete updating[ filename ];
+
+        }, 500 );
+    }
+
+    function onWatch( event, filename ) {
+        if ( !updating[ filename ] ) {
+            updating[ filename ] = true;
+
+            if ( rItemOrList.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) ) {
+                preload(function () {
+                    doneWatch( filename );
+                });
+            }
+        }
+    }
+
+    fs.watch( process.cwd(), onWatch );
+    fs.watch( directories.blocks, onWatch );
+    fs.watch( directories.collections, onWatch );
+    fs.watch( directories.styles, onWatch );
+},
+
+
+/**
+ *
+ * @method replaceAll
+ * @public
+ *
+ */
+replaceAll = function () {
+    replaceBlocks();
+    replaceScripts();
+    replaceSQSScripts();
+},
+
+
+/**
+ *
+ * @method watch
+ * @public
+ *
+ */
+refresh = function () {
+    //scripts = [];
+    sqsHeaders = [];
+    sqsFooters = [];
+},
+
 
 /**
  *
@@ -106,97 +219,32 @@ getSiteCss = function () {
 
 /**
  *
- * @method replaceSQSTags
- * @param {string} rendered The template rendering
- * @param {object} pageJson JSON data for page
- * @returns {string}
- * @private
- *
- */
-replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
-    var pageType = pageJson.item ? "item" : "collection",
-        pageId = pageJson.item ? pageJson.item.id : pageJson.collection.id,
-        bodyElem = pageHtml.match( rBodyTag ),
-        bodyAttr = sqsUtil.getAttrObj( bodyElem[ 0 ] );
-
-    rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
-    rendered = rendered.replace( SQS_POST_ENTRY, "" );
-    rendered = rendered.replace( SQS_PAGE_CLASSES, bodyAttr.class );
-    rendered = rendered.replace( SQS_PAGE_ID, (pageType + "-" + pageId) );
-
-    return rendered;
-},
-
-
-/**
- *
- * @method compileCollections
- * @public
- *
- */
-compileCollections = function () {
-    var collections = fs.readdirSync( directories.collections ),
-        file = null;
-
-    for ( var i = collections.length; i--; ) {
-        if ( rItemOrList.test( collections[ i ] ) ) {
-            file = path.join( directories.collections, collections[ i ] );
-
-            if ( fs.existsSync( file ) ) {
-                templates[ collections[ i ] ] = sqsUtil.packStr( sqsUtil.readFile( file ) );
-            }
-        }
-    }
-},
-
-
-/**
- *
- * @method compileRegions
- * @public
- *
- */
-compileRegions = function () {
-    var files = null,
-        file = null,
-        link = null;
-
-    for ( var i in config.template.layouts ) {
-        files = config.template.layouts[ i ].regions;
-        file = "";
-        link = (i + ".region");
-
-        for ( j = 0, len = files.length; j < len; j++ ) {
-            file += sqsUtil.packStr( sqsUtil.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) ) );
-        }
-
-        templates[ link ] = file;
-    }
-},
-
-
-/**
- *
  * @method replaceBlocks
  * @public
  *
  */
 replaceBlocks = function () {
     var matched,
-        block,
-        filed;
+        block;
 
-    for ( var i in templates ) {
-        if ( !rTplFiles.test( i ) ) {
-            continue;
-        }
-
-        while ( matched = templates[ i ].match( rBlockIncs ) ) {
+    for ( var i in templates.regions ) {
+        while ( matched = templates.regions[ i ].match( rBlockIncs ) ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
                 block = matched[ j ].replace( rBlockTags, "" );
-                filed = sqsUtil.packStr( sqsUtil.readFile( path.join( directories.blocks, block ) ) );
+                block = templates.blocks[ block ];
 
-                templates[ i ] = templates[ i ].replace( matched[ j ], filed );
+                templates.regions[ i ] = templates.regions[ i ].replace( matched[ j ], block );
+            }
+        }
+    }
+
+    for ( var i in templates.collections ) {
+        while ( matched = templates.collections[ i ].match( rBlockIncs ) ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                block = matched[ j ].replace( rBlockTags, "" );
+                block = templates.blocks[ block ];
+
+                templates.collections[ i ] = templates.collections[ i ].replace( matched[ j ], block );
             }
         }
     }
@@ -213,12 +261,8 @@ replaceScripts = function () {
     var matched,
         token;
 
-    for ( var i in templates ) {
-        if ( !rTplFiles.test( i ) ) {
-            continue;
-        }
-
-        matched = templates[ i ].match( rScripts );
+    for ( var i in templates.regions ) {
+        matched = templates.regions[ i ].match( rScripts );
 
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
@@ -229,7 +273,25 @@ replaceScripts = function () {
                         script: matched[ j ]
                     });
 
-                    templates[ i ] = templates[ i ].replace( matched[ j ], token );
+                    templates.regions[ i ] = templates.regions[ i ].replace( matched[ j ], token );
+                }
+            }
+        }
+    }
+
+    for ( var i in templates.collections ) {
+        matched = templates.collections[ i ].match( rScripts );
+
+        if ( matched ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                if ( !rJson.test( matched[ j ] ) ) {
+                    token = sqsUtil.getToken();
+                    scripts.push({
+                        token: token,
+                        script: matched[ j ]
+                    });
+
+                    templates.collections[ i ] = templates.collections[ i ].replace( matched[ j ], token );
                 }
             }
         }
@@ -249,12 +311,8 @@ replaceSQSScripts = function () {
         block,
         filed;
 
-    for ( var i in templates ) {
-        if ( !rTplFiles.test( i ) ) {
-            continue;
-        }
-
-        matched = templates[ i ].match( rSQSScripts );
+    for ( var i in templates.regions ) {
+        matched = templates.regions[ i ].match( rSQSScripts );
 
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
@@ -262,54 +320,24 @@ replaceSQSScripts = function () {
                 block = ( "/scripts/" + attrs.src );
                 filed = '<script src="' + block + '"></script>';
 
-                templates[ i ] = templates[ i ].replace( matched[ j ], filed );
+                templates.regions[ i ] = templates.regions[ i ].replace( matched[ j ], filed );
             }
         }
     }
-},
 
+    for ( var i in templates.collections ) {
+        matched = templates.collections[ i ].match( rSQSScripts );
 
-/**
- *
- * @method getTemplateKey
- * @param {object} pageJson JSON data for page
- * @public
- *
- */
-getTemplateKey = function ( pageJson ) {
-    var template = null,
-        regcheck = null,
-        typeName = null,
-        regionName = null;
+        if ( matched ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                attrs = sqsUtil.getAttrObj( matched[ j ] );
+                block = ( "/scripts/" + attrs.src );
+                filed = '<script src="' + block + '"></script>';
 
-    // This could happen, I suppose...
-    if ( !pageJson ) {
-        sqsUtil.log( "TEMPLATE - Page JSON UNDEFINED" );
-        return;
+                templates.collections[ i ] = templates.collections[ i ].replace( matched[ j ], filed );
+            }
+        }
     }
-
-    // Grab the collection typeName
-    typeName = pageJson.collection.typeName;
-
-    // Grab the regionName
-    regionName = (pageJson.collection.regionName || "default");
-
-    // Handle collection item
-    if ( pageJson.item ) {
-        template = (typeName + ".item");
-
-    // Handle collection list
-    } else if ( pageJson.items ) {
-        template = (typeName + ".list");
-
-    // Handle page
-    } else {
-        template = (regionName + ".region");
-    }
-
-    sqsUtil.log( "TEMPLATE - " + template );
-
-    return template;
 },
 
 
@@ -345,10 +373,10 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         regionKey = ((pageJson.collection.regionName || "default") + ".region");
 
         // This wraps the matched collection template with the default or set region
-        rendered += templates[ regionKey ].replace( SQS_MAIN_CONTENT, templates[ templateKey ] );
+        rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.collections[ templateKey ] );
 
     } else {
-        rendered += templates[ templateKey ];
+        rendered += templates.regions[ templateKey ];
     }
 
     // Pre-process Queries
@@ -496,66 +524,252 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 },
 
 
-/**
- *
- * @method compileStylesheets
- * @public
- *
- */
-compileStylesheets = function () {
-    var reset = path.join( directories.styles, "reset.css" ),
-        fpath,
-        file;
-
-    siteCss = "";
-
-    if ( fs.existsSync( reset ) ) {
-        siteCss += uglifycss.processString( sqsUtil.packStr( sqsUtil.readFile( reset ) ) );
-
-        sqsUtil.log( "CSS - reset" );
-    }
-
-    for ( var i = 0, len = config.template.stylesheets.length; i < len; i++ ) {
-        fpath = path.join( directories.styles, config.template.stylesheets[ i ] );
-
-        if ( !fs.existsSync( fpath ) ) {
-            continue;
-        }
-
-        file = ("" + fs.readFileSync( fpath ));
-
-        if ( rLess.test( config.template.stylesheets[ i ] ) ) {
-            less.render( file, function ( error, css ) {
-                siteCss += css;
-            });
-
-            sqsUtil.log( ("LESS - " + config.template.stylesheets[ i ]) );
-
-        } else {
-            siteCss += uglifycss.processString( file );
-
-            sqsUtil.log( ("CSS - " + config.template.stylesheets[ i ]) );
-        }
-    }
-},
-
-
-/**
- *
- * @method setSQSHeadersFooters
- * @public
- *
- */
-setSQSHeadersFooters = function () {
-    scripts = [];
-    sqsHeaders = [];
-    sqsFooters = [];
-},
-
-
 /******************************************************************************
  * @Private
 *******************************************************************************/
+
+/**
+ *
+ * @method compileRegions
+ * @param {function} cb The callback when done
+ * @private
+ *
+ */
+compileRegions = function ( cb ) {
+    var regions = [];
+
+    for ( var i in config.template.layouts ) {
+        regions.push({
+            files: sqsUtil.copyArr( config.template.layouts[ i ].regions ),
+            link: (i + ".region")
+        });
+    }
+
+    function read() {
+        if ( !regions.length ) {
+            cb();
+
+        } else {
+            var region = regions.pop(),
+                cont = "";
+
+            function _read() {
+                var file = path.join( config.server.webroot, (region.files.shift() + ".region") );
+
+                sqsUtil.readFile( file, function ( data ) {
+                    cont += sqsUtil.packStr( data );
+
+                    if ( !region.files.length ) {
+                        templates.regions[ region.link ] = cont;
+
+                        read();
+
+                    } else {
+                        _read();
+                    }
+                });
+            }
+
+            _read();
+        }
+    }
+
+    read();
+},
+
+
+/**
+ *
+ * @method compileBlocks
+ * @param {function} cb The callback when done
+ * @private
+ *
+ */
+compileBlocks = function ( cb ) {
+    sqsUtil.readDir( directories.blocks, function ( files ) {
+        function read() {
+            if ( !files.length ) {
+                cb();
+
+            } else {
+                var block = files.pop(),
+                    file = path.join( directories.blocks, block );
+
+                if ( !rBlock.test( block ) ) {
+                    read();
+                    return;
+                }
+
+                sqsUtil.readFile( file, function ( data ) {
+                    templates.blocks[ block ] = sqsUtil.packStr( data );
+
+                    read();
+                });
+            }
+        }
+
+        read();
+    });
+},
+
+
+/**
+ *
+ * @method compileCollections
+ * @param {function} cb The callback when done
+ * @private
+ *
+ */
+compileCollections = function ( cb ) {
+    sqsUtil.readDir( directories.collections, function ( files ) {
+        function read() {
+            if ( !files.length ) {
+                cb();
+
+            } else {
+                var collection = files.pop(),
+                    file = path.join( directories.collections, collection );
+
+                if ( !rItemOrList.test( collection ) ) {
+                    read();
+                    return;
+                }
+
+                sqsUtil.readFile( file, function ( data ) {
+                    templates.collections[ collection ] = sqsUtil.packStr( data );
+
+                    read();
+                });
+            }
+        }
+
+        read();
+    });
+},
+
+
+/**
+ *
+ * @method compileStylesheets
+ * @param {function} cb The callback when done
+ * @private
+ *
+ */
+compileStylesheets = function ( cb ) {
+    var styles = [{
+        name: "reset.css",
+        path: path.join( directories.styles, "reset.css" )
+    }];
+
+    for ( var i = 0, len = config.template.stylesheets.length; i < len; i++ ) {
+        styles.push({
+            name: config.template.stylesheets[ i ],
+            path: path.join( directories.styles, config.template.stylesheets[ i ] )
+        });
+    }
+
+    function read() {
+        if ( !styles.length ) {
+            cb();
+
+        } else {
+            var style = styles.pop();
+
+            sqsUtil.isFile( style.path, function ( exists ) {
+                if ( !exists ) {
+                    read();
+
+                } else {
+                    sqsUtil.readFile( style.path, function ( data ) {
+                        if ( rLess.test( style.name ) ) {
+                            less.render( data, function ( error, css ) {
+                                siteCss += css;
+
+                                read();
+                            });
+
+                        } else {
+                            siteCss += uglifycss.processString( data );
+
+                            read();
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    read();
+},
+
+
+/**
+ *
+ * @method replaceSQSTags
+ * @param {string} rendered The template rendering
+ * @param {object} pageJson JSON data for page
+ * @returns {string}
+ * @private
+ *
+ */
+replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
+    var pageType = pageJson.item ? "item" : "collection",
+        pageId = pageJson.item ? pageJson.item.id : pageJson.collection.id,
+        bodyElem = pageHtml.match( rBodyTag ),
+        bodyAttr = sqsUtil.getAttrObj( bodyElem[ 0 ] );
+
+    rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
+    rendered = rendered.replace( SQS_POST_ENTRY, "" );
+    rendered = rendered.replace( SQS_PAGE_CLASSES, bodyAttr.class );
+    rendered = rendered.replace( SQS_PAGE_ID, (pageType + "-" + pageId) );
+
+    return rendered;
+},
+
+
+/**
+ *
+ * @method getTemplateKey
+ * @param {object} pageJson JSON data for page
+ * @private
+ *
+ */
+getTemplateKey = function ( pageJson ) {
+    var template = null,
+        regcheck = null,
+        typeName = null,
+        regionName = null;
+
+    // This could happen, I suppose...
+    if ( !pageJson ) {
+        sqsUtil.log( "TEMPLATE - Page JSON UNDEFINED" );
+        return;
+    }
+
+    // Grab the collection typeName
+    typeName = pageJson.collection.typeName;
+
+    // Grab the regionName
+    regionName = (pageJson.collection.regionName || "default");
+
+    // Handle collection item
+    if ( pageJson.item ) {
+        template = (typeName + ".item");
+
+    // Handle collection list
+    } else if ( pageJson.items ) {
+        template = (typeName + ".list");
+
+    // Handle page
+    } else {
+        template = (regionName + ".region");
+    }
+
+    sqsUtil.log( "TEMPLATE - " + template );
+
+    return template;
+},
+
 
 /**
  *
@@ -645,7 +859,7 @@ replaceNavigations = function ( rendered, pageJson ) {
         for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
             attrs = sqsUtil.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
-            template = sqsUtil.packStr( sqsUtil.readFile( path.join( directories.blocks, block ) ) );
+            template = templates.blocks[ block ];
 
             for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
                 // Ensure the identifier is for THIS navigation ID
@@ -762,8 +976,7 @@ getBlockTypeName = function ( type ) {
  *
  */
 replaceBlockFields = function ( rendered, qrs, callback ) {
-    var layoutHtml = sqsUtil.packStr( sqsUtil.readFile( path.join( __dirname, "tpl/layout.html" ) ) ),
-        blockMatch = null,
+    var blockMatch = null,
         blockData = null,
         blockAttrs = null,
         matched = rendered.match( rSQSBlockFields ),
@@ -830,7 +1043,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                             }
                         }
 
-                        layout = mustache.render( layoutHtml, {
+                        layout = mustache.render( layoutHTML, {
                             attrs: blockAttrs,
                             data: blockData.data
                         });
@@ -872,18 +1085,15 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
         function getBlocks() {
             var block = matched.shift(),
-                blockPathHtml,
                 blockHtml;
 
             blockAttrs = sqsUtil.getAttrObj( block );
             blockAttrs.columns = (12 / blockAttrs.columns);
             blockMatch = block;
-            blockPathHtml = sqsCache.get( ("block-" + blockAttrs.id + ".html") );
+            blockHtml = sqsCache.get( ("block-" + blockAttrs.id + ".html") );
 
-            if ( blockPathHtml && qrs.nocache === undefined ) {
+            if ( blockHtml && qrs.nocache === undefined ) {
                 sqsUtil.log( "BLOCK CACHE -", blockAttrs.id );
-
-                blockHtml = blockPathHtml;
 
                 rendered = rendered.replace( blockMatch, blockHtml );
 
@@ -988,17 +1198,16 @@ lookupCollectionById = function ( id ) {
  * @Export
 *******************************************************************************/
 module.exports = {
-    setConfig: setConfig,
+    load: load,
+    watch: watch,
+    preload: preload,
+    refresh: refresh,
     setDirs: setDirs,
     setUser: setUser,
+    setConfig: setConfig,
     getSiteCss: getSiteCss,
-    compileCollections: compileCollections,
-    compileRegions: compileRegions,
     replaceBlocks: replaceBlocks,
     replaceScripts: replaceScripts,
-    replaceSQSScripts: replaceSQSScripts,
-    getTemplateKey: getTemplateKey,
     renderTemplate: renderTemplate,
-    compileStylesheets: compileStylesheets,
-    setSQSHeadersFooters: setSQSHeadersFooters
+    replaceSQSScripts: replaceSQSScripts
 };

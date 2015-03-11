@@ -210,6 +210,17 @@ copy = function ( obj ) {
     }
 
     return o;
+},
+
+
+copyArr = function ( arr ) {
+    var a = [];
+
+    for ( var i = arr.length; i--; ) {
+        a[ i ] = arr[ i ];
+    }
+
+    return a;
 };
 
 
@@ -228,5 +239,6 @@ module.exports = {
     getToken: getToken,
     getAttrObj: getAttrObj,
     packStr: packStr,
-    copy: copy
+    copy: copy,
+    copyArr: copyArr
 };

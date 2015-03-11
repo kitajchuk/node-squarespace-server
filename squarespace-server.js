@@ -82,14 +82,14 @@ setServerConfig = function ( conf ) {
 /**
  *
  * @method setTemplateConfig
- * @param {object} conf The parsed template.conf
+ * @param {object} conf The parsed template config object
  * @private
  *
  */
 setTemplateConfig = function ( conf ) {
     templateConfig = conf;
 
-    delete setTemplateConfig.server;
+    delete templateConfig.server;
 
     sqsTemplate.setConfig( "template", templateConfig );
 },
@@ -283,9 +283,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
         sqsUtil.log( "SITE CSS - " + appRequest.params[ 0 ] );
 
-        // Always serve fresh styles
-        sqsTemplate.compileStylesheets();
-
         appResponse.set( "Content-Type", "text/css" ).status( 200 ).send( sqsTemplate.getSiteCss() );
 
         return;
@@ -366,16 +363,8 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     // Log URI
     sqsUtil.log( "GET - " + appRequest.params[ 0 ] );
 
-    // Update the template config for all requests, reloads stylesheets etc...
-    setTemplateConfig( sqsUtil.readJson( templateConfigPath ) );
-
     // Run the template compiler
-    sqsTemplate.setSQSHeadersFooters();
-    sqsTemplate.compileCollections();
-    sqsTemplate.compileRegions();
-    sqsTemplate.replaceBlocks();
-    sqsTemplate.replaceScripts();
-    sqsTemplate.replaceSQSScripts();
+    sqsTemplate.refresh();
 
     // Render the response
     renderResponse( appRequest, appResponse );
@@ -585,20 +574,37 @@ module.exports = {
         processArguments( args, function () {
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
-                sqsUtil.log( "Template Loaded: Login" );
+                sqsUtil.log( "LOAD - Login" );
 
                 loginHTML = sqsUtil.packStr( data );
             });
 
             // Prefetch the 404 page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/404.html" ), function ( data ) {
-                sqsUtil.log( "Template Loaded: 404" );
+                sqsUtil.log( "LOAD - 404" );
 
                 fourOhFourHTML = sqsUtil.packStr( data );
             });
 
-            sqsCache.preload(function () {
+            // Preload the sqs-cache
+            sqsCache.preload( function () {} );
+
+            // Preload and process the template
+            sqsTemplate.load();
+            sqsTemplate.preload(function () {
+                // Watch for template changes
+                sqsTemplate.watch();
+
                 startServer();
+            });
+
+            // Watch for changes to template.conf and reload it
+            fs.watchFile( templateConfigPath, function () {
+                sqsUtil.readJson( templateConfigPath, function ( data ) {
+                    sqsUtil.log( "WATCH - Template.Conf Updated" );
+
+                    setTemplateConfig( data );
+                });
             });
         });
     },
