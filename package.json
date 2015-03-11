@@ -39,7 +39,6 @@
         "express": "~4.9",
         "slug": "~0.7",
         "less": "~1.7",
-        "underscore": "~1.7",
         "uglifycss": "0.0.9",
         "body-parser": "~1.9",
         "cookie": "~0.1",

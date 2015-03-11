@@ -10,16 +10,12 @@
  *      - api-*.json
  *
  */
-var _ = require( "underscore" ),
-    bodyParser = require( "body-parser" ),
+var bodyParser = require( "body-parser" ),
     express = require( "express" ),
     path = require( "path" ),
     fs = require( "fs" ),
-    fse = require( "fs-extra" ),
     slug = require( "slug" ),
-    sqsMiddleware = require( "node-squarespace-middleware" ),
-    functions = require( "./lib/functions" ),
-    sqsTemplate = require( "./squarespace-template" ),
+
     rProtocol = /^https:|^http:/g,
     rSlash = /^\/|\/$/g,
     rIco = /\.ico$/,
@@ -33,7 +29,14 @@ var _ = require( "underscore" ),
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
-    packageJson = functions.readJson( path.join( __dirname, "package.json" ) ),
+    version = "0.1.31",
+    loginHTML = "",
+    fourOhFourHTML = "",
+
+    sqsMiddleware = require( "node-squarespace-middleware" ),
+    sqsUtil = require( "./squarespace-util" ),
+    sqsTemplate = require( "./squarespace-template" ),
+    sqsCache = require( "./squarespace-cache" ),
 
 
 /**
@@ -44,7 +47,6 @@ var _ = require( "underscore" ),
  *      webroot,
  *      protocol,
  *      siteData,
- *      cacheroot,
  *      password
  * };
  *
@@ -61,14 +63,6 @@ setServerConfig = function ( conf ) {
     serverConfig.webroot = process.cwd();
     serverConfig.protocol = serverConfig.siteurl.match( rProtocol )[ 0 ];
     serverConfig.siteData = {};
-
-    if ( !serverConfig.cacheroot ) {
-        serverConfig.cacheroot = path.join( serverConfig.webroot, ".sqs-cache" );
-
-        if ( !fs.existsSync( serverConfig.cacheroot ) ) {
-            fs.mkdirSync( serverConfig.cacheroot );
-        }
-    }
 
     // Set config for middleware
     sqsMiddleware.set( "siteurl", serverConfig.siteurl );
@@ -116,7 +110,8 @@ setDirectories = function () {
         assets: path.join( serverConfig.webroot, "assets" ),
         pages: path.join( serverConfig.webroot, "pages" ),
         scripts: path.join( serverConfig.webroot, "scripts" ),
-        styles: path.join( serverConfig.webroot, "styles" )
+        styles: path.join( serverConfig.webroot, "styles" ),
+        presets: path.join( serverConfig.webroot, "presets" )
     };
 
     // Set directories on external modules
@@ -153,36 +148,23 @@ renderResponse = function ( appRequest, appResponse ) {
         }
     }
 
-    cacheHtml = path.join( serverConfig.cacheroot, (cacheName + ".html") );
-    cacheJson = path.join( serverConfig.cacheroot, (cacheName + ".json") );
-
-    // JSON cache?
-    if ( fs.existsSync( cacheJson ) ) {
-        cacheJson = functions.readJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ) );
-
-    } else {
-        cacheJson = null;
-    }
-
-    // HTML cache?
-    if ( fs.existsSync( cacheHtml ) ) {
-        cacheHtml = functions.readFileSquashed( path.join( serverConfig.cacheroot, (cacheName + ".html") ) );
-
-    } else {
-        cacheHtml = null;
-    }
+    cacheHtml = sqsCache.get( (cacheName + ".html") );
+    cacheJson = sqsCache.get( (cacheName + ".json") );
 
     // Nocache?
-    if (  appRequest.query.nocache !== undefined ) {
+    if ( appRequest.query.nocache !== undefined ) {
         cacheJson = null;
         cacheHtml = null;
 
-        functions.log( "Clearing request cache" );
+        sqsCache.remove( (cacheName + ".html") );
+        sqsCache.remove( (cacheName + ".json") );
+
+        sqsUtil.log( "Clearing request cache" );
     }
 
     // Cache?
     if ( cacheJson && cacheHtml && appRequest.query.format !== "json" ) {
-        functions.log( "Loading request from cache" );
+        sqsUtil.log( "Loading request from cache" );
 
         sqsTemplate.renderTemplate( qrs, cacheJson, cacheHtml, function ( tpl ) {
             appResponse.status( 200 ).send( tpl );
@@ -194,20 +176,20 @@ renderResponse = function ( appRequest, appResponse ) {
     // JSON?
     if ( appRequest.query.format === "json" ) {
         if ( cacheJson ) {
-            functions.log( "Loading json from cache" );
+            sqsUtil.log( "Loading json from cache" );
 
             appResponse.status( 200 ).json( cacheJson );
 
         } else {
             sqsMiddleware.getJson( url, qrs, function ( error, json ) {
                 if ( !error ) {
-                    functions.writeJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ), json.json );
+                    sqsCache.set( (cacheName + ".json"), json.json );
 
                     appResponse.status( 200 ).json( json.json );
 
                 } else {
                     // Handle errors
-                    functions.log( "ERROR - " + error );
+                    sqsUtil.log( "ERROR - " + error );
                 }
             });
         }
@@ -217,23 +199,23 @@ renderResponse = function ( appRequest, appResponse ) {
         sqsMiddleware.getJsonAndHtml( url, qrs, function ( error, data ) {
             if ( !error ) {
                 if ( data.html.status === 404 || data.json.status === 404 ) {
-                    appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/404.html" ) ) );
+                    appResponse.status( 200 ).send( fourOhFourHTML );
 
-                    functions.log( "404 - Handled" );
+                    sqsUtil.log( "404 - Handled" );
 
                     return;
                 }
 
-                functions.writeJson( path.join( serverConfig.cacheroot, (cacheName + ".json") ), data.json.json );
-                functions.writeFile( path.join( serverConfig.cacheroot, (cacheName + ".html") ), functions.squashContent( data.html.html ) );
+                sqsCache.set( (cacheName + ".json"), data.json.json );
+                sqsCache.set( (cacheName + ".html"), data.html.html );
 
-                sqsTemplate.renderTemplate( qrs, data.json.json, functions.squashContent( data.html.html ), function ( tpl ) {
+                sqsTemplate.renderTemplate( qrs, data.json.json, sqsCache.get( (cacheName + ".html") ), function ( tpl ) {
                     appResponse.status( 200 ).send( tpl );
                 });
 
             } else {
                 // Handle errors
-                functions.log( "ERROR - " + error );
+                sqsUtil.log( "ERROR - " + error );
             }
         });
     }
@@ -299,7 +281,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Site CSS
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
-        functions.log( "SITE CSS - " + appRequest.params[ 0 ] );
+        sqsUtil.log( "SITE CSS - " + appRequest.params[ 0 ] );
 
         // Always serve fresh styles
         sqsTemplate.compileStylesheets();
@@ -311,7 +293,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
-        functions.log( "API - " + appRequest.params[ 0 ] );
+        sqsUtil.log( "API - " + appRequest.params[ 0 ] );
 
         apiQuery = appRequest.query;
         apiQuery.crumb = sqsMiddleware.getCrumb();
@@ -334,7 +316,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Config
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "config" ) {
-        functions.log( "CONFIG - Author your content!" );
+        sqsUtil.log( "CONFIG - Author your content!" );
 
         appResponse.redirect( (serverConfig.siteurl + "/config/") );
 
@@ -343,7 +325,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Logout
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "logout" ) {
-        functions.log( "AUTH - Logout of Squarespace!" );
+        sqsUtil.log( "AUTH - Logout of Squarespace!" );
 
         sqsUser = null;
 
@@ -354,16 +336,16 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Authentication
     if ( !sqsUser ) {
-        functions.log( "AUTH - Login to Squarespace!" );
+        sqsUtil.log( "AUTH - Login to Squarespace!" );
 
-        appResponse.status( 200 ).send( functions.readFileSquashed( path.join( __dirname, "tpl/login.html" ) ) );
+        appResponse.status( 200 ).send( loginHTML );
 
         return;
     }
 
     // Login expired
     if ( (Date.now() - sqsTimeOfLogin) >= sqsTimeLoggedIn ) {
-        functions.log( "AUTH EXPIRED - Logout of Squarespace!" );
+        sqsUtil.log( "AUTH EXPIRED - Logout of Squarespace!" );
 
         appResponse.redirect( "/logout" );
 
@@ -374,7 +356,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     checkFolder = getFolderRoot( appRequest.params[ 0 ] );
 
     if ( checkFolder.folder ) {
-        functions.log( "FOLDER ROOT - " + appRequest.params[ 0 ] );
+        sqsUtil.log( "FOLDER ROOT - " + appRequest.params[ 0 ] );
 
         appResponse.redirect( checkFolder.redirect );
 
@@ -382,10 +364,10 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     }
 
     // Log URI
-    functions.log( "GET - " + appRequest.params[ 0 ] );
+    sqsUtil.log( "GET - " + appRequest.params[ 0 ] );
 
     // Update the template config for all requests, reloads stylesheets etc...
-    setTemplateConfig( functions.readJson( templateConfigPath ) );
+    setTemplateConfig( sqsUtil.readJson( templateConfigPath ) );
 
     // Run the template compiler
     sqsTemplate.setSQSHeadersFooters();
@@ -415,9 +397,9 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
         };
 
     if ( !data.email || !data.password ) {
-        functions.log( "AUTH - Email AND Password required." );
+        sqsUtil.log( "AUTH - Email AND Password required." );
 
-        appResponse.send( functions.readFileSquashed( path.join( __dirname, "tpl/login.html" ) ) );
+        appResponse.send( loginHTML );
 
         return;
     }
@@ -454,13 +436,13 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    functions.log( "ERROR - " + error );
+                    sqsUtil.log( "ERROR - " + error );
                 }
             });
 
         } else {
             // Handle errors
-            functions.log( "ERROR - " + error );
+            sqsUtil.log( "ERROR - " + error );
 
             // Reload login
             appResponse.redirect( "/" );
@@ -477,7 +459,7 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
  */
 printUsage = function () {
     console.log( "Squarespace Server" );
-    console.log( "Version " + packageJson.version );
+    console.log( "Version " + version );
     console.log();
     console.log( "Commands:" );
     console.log( "sqs buster       Delete local site cache" );
@@ -502,7 +484,7 @@ printUsage = function () {
  *
  */
 printVersion = function () {
-    functions.log( packageJson.version );
+    sqsUtil.log( version );
     process.exit();
 },
 
@@ -514,7 +496,7 @@ printVersion = function () {
  * @private
  *
  */
-processArguments = function ( args ) {
+processArguments = function ( args, cb ) {
     var flags = {},
         commands = {};
 
@@ -522,8 +504,9 @@ processArguments = function ( args ) {
         printUsage();
     }
 
-    _.each( args, function ( arg ) {
-        var rFlag = /^--/,
+    for ( var i = 0, len = args.length; i < len; i++ ) {
+        var arg = args[ i ],
+            rFlag = /^--/,
             split;
 
         if ( rFlag.test( arg ) ) {
@@ -533,16 +516,15 @@ processArguments = function ( args ) {
         } else {
             commands[ arg ] = true;
         }
-    });
+    }
 
     // Order of operations
     if ( flags.version ) {
-        functions.log( packageJson.version );
+        sqsUtil.log( version );
         process.exit();
 
     } else if ( commands.buster ) {
-        fse.removeSync( path.join( serverConfig.cacheroot ) );
-        functions.log( "Trashed your local .sqs-cache." );
+        sqsCache.clear();
         process.exit();
 
     } else if ( commands.server ) {
@@ -550,7 +532,7 @@ processArguments = function ( args ) {
             serverConfig.port = flags.port;
         }
 
-        startServer();
+        cb();
     }
 },
 
@@ -572,7 +554,7 @@ startServer = function () {
     expressApp.listen( expressApp.get( "port" ) );
 
     // Log that the server is running
-    functions.log( ("Running site on localhost:" + expressApp.get( "port" )) );
+    sqsUtil.log( ("Running on Port:" + expressApp.get( "port" )) );
 };
 
 
@@ -599,7 +581,26 @@ module.exports = {
         setDirectories();
 
         // Handle arguments
-        processArguments( args );
+        // If Callback runs, start the server
+        processArguments( args, function () {
+            // Prefetch the login page HTML
+            sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
+                sqsUtil.log( "Template Loaded: Login" );
+
+                loginHTML = sqsUtil.packStr( data );
+            });
+
+            // Prefetch the 404 page HTML
+            sqsUtil.readFile( path.join( __dirname, "tpl/404.html" ), function ( data ) {
+                sqsUtil.log( "Template Loaded: 404" );
+
+                fourOhFourHTML = sqsUtil.packStr( data );
+            });
+
+            sqsCache.preload(function () {
+                startServer();
+            });
+        });
     },
 
     /**

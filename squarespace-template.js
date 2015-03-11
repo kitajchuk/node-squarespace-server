@@ -3,16 +3,12 @@
  * Squarespace template.
  *
  */
-var _ = require( "underscore" ),
-    path = require( "path" ),
+var path = require( "path" ),
     fs = require( "fs" ),
     less = require( "less" ),
     uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
-    sqsMiddleware = require( "node-squarespace-middleware" ),
-    functions = require( "./lib/functions" ),
-    blocktypes = require( "./lib/blocktypes" ),
-    sqsJsonTemplate = require( "node-squarespace-jsont" ),
+
     rSlash = /^\/|\/$/g,
     rJsonT = /^\{.*?\}$/,
     rScripts = /<script.*?\>(.*?)<\/script\>/g,
@@ -48,6 +44,12 @@ var _ = require( "underscore" ),
     scripts = [],
     siteCss = null,
     templates = {},
+
+    sqsMiddleware = require( "node-squarespace-middleware" ),
+    sqsUtil = require( "./squarespace-util" ),
+    sqsBlocktypes = require( "./squarespace-blocktypes" ),
+    sqsJsonTemplate = require( "node-squarespace-jsont" ),
+    sqsCache = require( "./squarespace-cache" ),
 
 
 /******************************************************************************
@@ -115,7 +117,7 @@ replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
     var pageType = pageJson.item ? "item" : "collection",
         pageId = pageJson.item ? pageJson.item.id : pageJson.collection.id,
         bodyElem = pageHtml.match( rBodyTag ),
-        bodyAttr = functions.getAttrObj( bodyElem[ 0 ] );
+        bodyAttr = sqsUtil.getAttrObj( bodyElem[ 0 ] );
 
     rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
@@ -141,7 +143,7 @@ compileCollections = function () {
             file = path.join( directories.collections, collections[ i ] );
 
             if ( fs.existsSync( file ) ) {
-                templates[ collections[ i ] ] = functions.readFileSquashed( file );
+                templates[ collections[ i ] ] = sqsUtil.packStr( sqsUtil.readFile( file ) );
             }
         }
     }
@@ -165,7 +167,7 @@ compileRegions = function () {
         link = (i + ".region");
 
         for ( j = 0, len = files.length; j < len; j++ ) {
-            file += functions.readFileSquashed( path.join( config.server.webroot, (files[ j ] + ".region") ) );
+            file += sqsUtil.packStr( sqsUtil.readFile( path.join( config.server.webroot, (files[ j ] + ".region") ) ) );
         }
 
         templates[ link ] = file;
@@ -192,7 +194,7 @@ replaceBlocks = function () {
         while ( matched = templates[ i ].match( rBlockIncs ) ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
                 block = matched[ j ].replace( rBlockTags, "" );
-                filed = functions.readFileSquashed( path.join( directories.blocks, block ) );
+                filed = sqsUtil.packStr( sqsUtil.readFile( path.join( directories.blocks, block ) ) );
 
                 templates[ i ] = templates[ i ].replace( matched[ j ], filed );
             }
@@ -221,7 +223,7 @@ replaceScripts = function () {
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
                 if ( !rJson.test( matched[ j ] ) ) {
-                    token = functions.getToken();
+                    token = sqsUtil.getToken();
                     scripts.push({
                         token: token,
                         script: matched[ j ]
@@ -256,7 +258,7 @@ replaceSQSScripts = function () {
 
         if ( matched ) {
             for ( var j = 0, len = matched.length; j < len; j++ ) {
-                attrs = functions.getAttrObj( matched[ j ] );
+                attrs = sqsUtil.getAttrObj( matched[ j ] );
                 block = ( "/scripts/" + attrs.src );
                 filed = '<script src="' + block + '"></script>';
 
@@ -282,7 +284,7 @@ getTemplateKey = function ( pageJson ) {
 
     // This could happen, I suppose...
     if ( !pageJson ) {
-        functions.log( "TEMPLATE - Page JSON UNDEFINED" );
+        sqsUtil.log( "TEMPLATE - Page JSON UNDEFINED" );
         return;
     }
 
@@ -305,7 +307,7 @@ getTemplateKey = function ( pageJson ) {
         template = (regionName + ".region");
     }
 
-    functions.log( "TEMPLATE - " + template );
+    sqsUtil.log( "TEMPLATE - " + template );
 
     return template;
 },
@@ -355,7 +357,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     if ( matched ) {
         for ( i = 0, len = matched.length; i < len; i++ ) {
             var match = matched[ i ].match( rSQSQuery ),
-                token = functions.getToken();
+                token = sqsUtil.getToken();
 
             rendered = rendered.replace( match[ 2 ], token );
 
@@ -396,7 +398,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
                 if ( queries.raw[ j ].token === token ) {
                     queries.processed.push({
                         template: queries.raw[ j ].template,
-                        queryData: functions.getAttrObj( match[ 1 ] ),
+                        queryData: sqsUtil.getAttrObj( match[ 1 ] ),
                         queryProcessed: match[ 0 ]
                     });
                 }
@@ -446,13 +448,13 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             cacheSlug += "-category--" + query.queryData.category;
         }
 
-        cacheSlug = path.join( config.server.cacheroot, (cacheSlug + ".json") );
+        cacheSlug = (cacheSlug + ".json");
 
         // Cached?
-        if ( fs.existsSync( cacheSlug ) && qrs.nocache === undefined ) {
-            functions.log( "CACHE - Loading cached query" );
+        if ( sqsCache.get( cacheSlug ) && qrs.nocache === undefined ) {
+            sqsUtil.log( "CACHE - Loading cached query" );
 
-            json = functions.readJson( cacheSlug );
+            json = sqsCache.get( cacheSlug );
 
             tpl = sqsJsonTemplate.render( query.template, json );
 
@@ -462,14 +464,14 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
         } else {
             if ( qrs.nocache !== undefined ) {
-                functions.log( "CACHE - Clearing cached query: ", query.queryData.collection );
+                sqsUtil.log( "CACHE - Clearing cached query: ", query.queryData.collection );
             }
 
             sqsMiddleware.getQuery( query.queryData, qrs, function ( error, json ) {
-                functions.log( "QUERY - " + query.queryData.collection );
+                sqsUtil.log( "QUERY - " + query.queryData.collection );
 
                 if ( !error ) {
-                    functions.writeJson( cacheSlug, json );
+                    sqsCache.set( cacheSlug, json );
 
                     tpl = sqsJsonTemplate.render( query.template, json );
 
@@ -479,7 +481,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
                 } else {
                     // Handle errors
-                    functions.log( "ERROR - " + error );
+                    sqsUtil.log( "ERROR - " + error );
                 }
             });
         }
@@ -508,9 +510,9 @@ compileStylesheets = function () {
     siteCss = "";
 
     if ( fs.existsSync( reset ) ) {
-        siteCss += uglifycss.processString( functions.readFileSquashed( reset ) );
+        siteCss += uglifycss.processString( sqsUtil.packStr( sqsUtil.readFile( reset ) ) );
 
-        functions.log( "CSS - reset" );
+        sqsUtil.log( "CSS - reset" );
     }
 
     for ( var i = 0, len = config.template.stylesheets.length; i < len; i++ ) {
@@ -527,12 +529,12 @@ compileStylesheets = function () {
                 siteCss += css;
             });
 
-            functions.log( ("LESS - " + config.template.stylesheets[ i ]) );
+            sqsUtil.log( ("LESS - " + config.template.stylesheets[ i ]) );
 
         } else {
             siteCss += uglifycss.processString( file );
 
-            functions.log( ("CSS - " + config.template.stylesheets[ i ]) );
+            sqsUtil.log( ("CSS - " + config.template.stylesheets[ i ]) );
         }
     }
 },
@@ -565,9 +567,9 @@ setSQSHeadersFooters = function () {
  *
  */
 setHeaderFooterTokens = function ( pageJson, pageHtml ) {
-    var tokenHeadersFull = functions.getToken(),
-        tokenFootersFull = functions.getToken(),
-        tokenStyleTag = functions.getToken(),
+    var tokenHeadersFull = sqsUtil.getToken(),
+        tokenFootersFull = sqsUtil.getToken(),
+        tokenStyleTag = sqsUtil.getToken(),
         sHeadersFull = pageHtml.match( rSQSHeadersFull ),
         sFootersFull = pageHtml.match( rSQSFootersFull ),
         siteStyleTag = null;
@@ -641,9 +643,9 @@ replaceNavigations = function ( rendered, pageJson ) {
 
     if ( matched ) {
         for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
-            attrs = functions.getAttrObj( matched[ i ] );
+            attrs = sqsUtil.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
-            template = functions.readFileSquashed( path.join( directories.blocks, block ) );
+            template = sqsUtil.packStr( sqsUtil.readFile( path.join( directories.blocks, block ) ) );
 
             for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
                 // Ensure the identifier is for THIS navigation ID
@@ -682,10 +684,9 @@ replaceNavigations = function ( rendered, pageJson ) {
                             }
 
                         } else {
-                            item = _.extend( link, {
-                                active: (link.title === pageJson.collection.title),
-                                folderActive: (link.title === pageJson.collection.title)
-                            });
+                            item = sqsUtil.copy( link );
+                            item.active = (link.title === pageJson.collection.title);
+                            item.folderActive = (link.title === pageJson.collection.title);
                         }
 
                         items.push( item );
@@ -740,8 +741,8 @@ replaceClickThroughUrls = function ( rendered ) {
 getBlockTypeName = function ( type ) {
     var ret = "";
 
-    for ( var t in blocktypes ) {
-        if ( type === blocktypes[ t ] ) {
+    for ( var t in sqsBlocktypes ) {
+        if ( type === sqsBlocktypes[ t ] ) {
         	ret = t.toLowerCase().replace( /_/g, "-" );
         	break;
         }
@@ -761,7 +762,7 @@ getBlockTypeName = function ( type ) {
  *
  */
 replaceBlockFields = function ( rendered, qrs, callback ) {
-    var layoutHtml = functions.readFileSquashed( path.join( __dirname, "tpl/layout.html" ) ),
+    var layoutHtml = sqsUtil.packStr( sqsUtil.readFile( path.join( __dirname, "tpl/layout.html" ) ) ),
         blockMatch = null,
         blockData = null,
         blockAttrs = null,
@@ -789,7 +790,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 var layout;
 
                 if ( !error ) {
-                    functions.log( "WIDGET GET - ", block.id );
+                    sqsUtil.log( "WIDGET GET - ", block.id );
 
                     widgets[ block.id ] = json.html;
 
@@ -836,7 +837,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                         rendered = rendered.replace( blockMatch, layout );
 
-                        functions.writeFile( path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") ), layout );
+                        sqsCache.set( ("block-" + blockAttrs.id + ".html"), layout );
 
                         if ( !matched.length ) {
                             callback( rendered );
@@ -851,7 +852,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 } else {
                     // Handle errors
-                    functions.log( "ERROR - " + error );
+                    sqsUtil.log( "ERROR - " + error );
 
                     // Skip it for now...
                     if ( !blocks.length ) {
@@ -874,15 +875,15 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 blockPathHtml,
                 blockHtml;
 
-            blockAttrs = functions.getAttrObj( block );
+            blockAttrs = sqsUtil.getAttrObj( block );
             blockAttrs.columns = (12 / blockAttrs.columns);
             blockMatch = block;
-            blockPathHtml = path.join( config.server.cacheroot, ("block-" + blockAttrs.id + ".html") );
+            blockPathHtml = sqsCache.get( ("block-" + blockAttrs.id + ".html") );
 
-            if ( fs.existsSync( blockPathHtml ) && qrs.nocache === undefined ) {
-                functions.log( "BLOCK CACHE -", blockAttrs.id );
+            if ( blockPathHtml && qrs.nocache === undefined ) {
+                sqsUtil.log( "BLOCK CACHE -", blockAttrs.id );
 
-                blockHtml = functions.readFile( blockPathHtml );
+                blockHtml = blockPathHtml;
 
                 rendered = rendered.replace( blockMatch, blockHtml );
 
@@ -899,7 +900,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 sqsMiddleware.getBlockJson( blockAttrs.id, function ( error, json ) {
                     if ( !error ) {
-                        functions.log( "BLOCK GET -", blockAttrs.id );
+                        sqsUtil.log( "BLOCK GET -", blockAttrs.id );
 
                         blockData = json;
 
@@ -940,7 +941,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                     } else {
                         // Handle errors
-                        functions.log( "ERROR - " + error );
+                        sqsUtil.log( "ERROR - " + error );
 
                         if ( !matched.length ) {
                             callback( rendered );
