@@ -37,7 +37,7 @@ if ( versionIdx !== -1 ) {
     // Splice --forever flag from the argument list
     args.splice( foreverIdx, 1 );
 
-    exec( (forever + " --uid 'node-squarespace-server' start " + startup + " " + args.join( " " ) ), function ( error, stdout ) {} );
+    exec( (forever + " -a --uid 'node-squarespace-server' start " + startup + " " + args.join( " " ) ), function ( error, stdout ) {} );
 
 // Stop server started with forever process
 } else if ( forneverIdx !== -1 ) {
