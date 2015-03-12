@@ -4,6 +4,10 @@ node-squarespace-server
 > A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com).
 
 
+### Release
+- [0.2.0 - The latest and greatest](https://github.com/kitajchuk/node-squarespace-server/wiki/Release-0.2.0)
+
+
 ### Installation
 ```shell
 npm install -g node-squarespace-server
