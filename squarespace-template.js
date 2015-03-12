@@ -66,13 +66,13 @@ var path = require( "path" ),
 
 /**
  *
- * @method load
+ * @method preload
  * @public
  *
  */
-load = function () {
+preload = function () {
     sqsUtil.readFile( path.join( __dirname, "tpl/layout.html" ), function ( data ) {
-        sqsUtil.log( "LOAD - Layout" );
+        //sqsUtil.log( "LOAD - Layout" );
 
         layoutHTML = sqsUtil.packStr( data );
     });
@@ -81,12 +81,12 @@ load = function () {
 
 /**
  *
- * @method preload
+ * @method compile
  * @param {function} cb The callback when loaded
  * @public
  *
  */
-preload = function ( cb ) {
+compile = function ( cb ) {
     var compiled = 0;
 
     function done() {
@@ -114,7 +114,7 @@ preload = function ( cb ) {
  */
 watch = function () {
     function doneWatch( filename ) {
-        sqsUtil.log( ("WATCH - " + filename) );
+        sqsUtil.log( "Template.reloaded" );
 
         replaceAll();
 
@@ -128,8 +128,10 @@ watch = function () {
         if ( !updating[ filename ] ) {
             updating[ filename ] = true;
 
+            sqsUtil.log( ("Template.watch: " + filename + " updated") );
+
             if ( rItemOrList.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) ) {
-                preload(function () {
+                compile(function () {
                     doneWatch( filename );
                 });
             }
@@ -453,53 +455,45 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         }
 
         var query = queries.processed[ processedQueries ],
-            cacheSlug = "",
-            tpl;
+            cache = null,
+            key = "",
+            tpl = null;
 
         processedQueries++;
-        cacheSlug = ("query-" + query.queryData.collection);
+        key = ("query-" + query.queryData.collection);
 
         for ( i in qrs ) {
             // Skip password in unique cache
             if ( i !== "format" && i !== "password" && i !== "nocache" ) {
-                cacheSlug += ("-" + i + "--" + qrs[ i ]);
+                key += ("-" + i + "--" + qrs[ i ]);
             }
         }
 
         // Tag?
         if ( query.queryData.tag ) {
-            cacheSlug += "-tag--" + query.queryData.tag;
+            key += "-tag--" + query.queryData.tag;
         }
 
         // Category?
         if ( query.queryData.category ) {
-            cacheSlug += "-category--" + query.queryData.category;
+            key += "-category--" + query.queryData.category;
         }
 
-        cacheSlug = (cacheSlug + ".json");
+        key = (cache + ".json");
+        cache = sqsCache.get( key );
 
         // Cached?
-        if ( sqsCache.get( cacheSlug ) && qrs.nocache === undefined ) {
-            sqsUtil.log( "CACHE - Loading cached query" );
-
-            json = sqsCache.get( cacheSlug );
-
-            tpl = sqsJsonTemplate.render( query.template, json );
+        if ( cache && qrs.nocache === undefined ) {
+            tpl = sqsJsonTemplate.render( query.template, cache );
 
             rendered = rendered.replace( query.queryProcessed, tpl );
 
             handleQueried();
 
         } else {
-            if ( qrs.nocache !== undefined ) {
-                sqsUtil.log( "CACHE - Clearing cached query: ", query.queryData.collection );
-            }
-
             sqsMiddleware.getQuery( query.queryData, qrs, function ( error, json ) {
-                sqsUtil.log( "QUERY - " + query.queryData.collection );
-
                 if ( !error ) {
-                    sqsCache.set( cacheSlug, json );
+                    sqsCache.set( key, json );
 
                     tpl = sqsJsonTemplate.render( query.template, json );
 
@@ -509,7 +503,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "ERROR - " + error );
+                    sqsUtil.log( "Server.error: " + error );
                 }
             });
         }
@@ -742,7 +736,6 @@ getTemplateKey = function ( pageJson ) {
 
     // This could happen, I suppose...
     if ( !pageJson ) {
-        sqsUtil.log( "TEMPLATE - Page JSON UNDEFINED" );
         return;
     }
 
@@ -764,8 +757,6 @@ getTemplateKey = function ( pageJson ) {
     } else {
         template = (regionName + ".region");
     }
-
-    sqsUtil.log( "TEMPLATE - " + template );
 
     return template;
 },
@@ -1003,8 +994,6 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 var layout;
 
                 if ( !error ) {
-                    sqsUtil.log( "WIDGET GET - ", block.id );
-
                     widgets[ block.id ] = json.html;
 
                     if ( !blocks.length ) {
@@ -1065,7 +1054,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "ERROR - " + error );
+                    sqsUtil.log( "Server.error: " + error );
 
                     // Skip it for now...
                     if ( !blocks.length ) {
@@ -1093,8 +1082,6 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
             blockHtml = sqsCache.get( ("block-" + blockAttrs.id + ".html") );
 
             if ( blockHtml && qrs.nocache === undefined ) {
-                sqsUtil.log( "BLOCK CACHE -", blockAttrs.id );
-
                 rendered = rendered.replace( blockMatch, blockHtml );
 
                 if ( !matched.length ) {
@@ -1110,8 +1097,6 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 sqsMiddleware.getBlockJson( blockAttrs.id, function ( error, json ) {
                     if ( !error ) {
-                        sqsUtil.log( "BLOCK GET -", blockAttrs.id );
-
                         blockData = json;
 
                         rLen = blockData.data.layout.rows.length;
@@ -1151,7 +1136,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                     } else {
                         // Handle errors
-                        sqsUtil.log( "ERROR - " + error );
+                        sqsUtil.log( "Server.error: " + error );
 
                         if ( !matched.length ) {
                             callback( rendered );
@@ -1198,9 +1183,9 @@ lookupCollectionById = function ( id ) {
  * @Export
 *******************************************************************************/
 module.exports = {
-    load: load,
     watch: watch,
     preload: preload,
+    compile: compile,
     refresh: refresh,
     setDirs: setDirs,
     setUser: setUser,

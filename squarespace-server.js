@@ -158,14 +158,10 @@ renderResponse = function ( appRequest, appResponse ) {
 
         sqsCache.remove( (cacheName + ".html") );
         sqsCache.remove( (cacheName + ".json") );
-
-        sqsUtil.log( "Clearing request cache" );
     }
 
     // Cache?
     if ( cacheJson && cacheHtml && appRequest.query.format !== "json" ) {
-        sqsUtil.log( "Loading request from cache" );
-
         sqsTemplate.renderTemplate( qrs, cacheJson, cacheHtml, function ( tpl ) {
             appResponse.status( 200 ).send( tpl );
         });
@@ -176,8 +172,6 @@ renderResponse = function ( appRequest, appResponse ) {
     // JSON?
     if ( appRequest.query.format === "json" ) {
         if ( cacheJson ) {
-            sqsUtil.log( "Loading json from cache" );
-
             appResponse.status( 200 ).json( cacheJson );
 
         } else {
@@ -189,7 +183,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "ERROR - " + error );
+                    sqsUtil.log( "Server.error: " + error );
                 }
             });
         }
@@ -201,7 +195,7 @@ renderResponse = function ( appRequest, appResponse ) {
                 if ( data.html.status === 404 || data.json.status === 404 ) {
                     appResponse.status( 200 ).send( fourOhFourHTML );
 
-                    sqsUtil.log( "404 - Handled" );
+                    sqsUtil.log( "Server.404" );
 
                     return;
                 }
@@ -215,7 +209,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
             } else {
                 // Handle errors
-                sqsUtil.log( "ERROR - " + error );
+                sqsUtil.log( "Server.error: " + error );
             }
         });
     }
@@ -281,8 +275,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Site CSS
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
-        sqsUtil.log( "SITE CSS - " + appRequest.params[ 0 ] );
-
         appResponse.set( "Content-Type", "text/css" ).status( 200 ).send( sqsTemplate.getSiteCss() );
 
         return;
@@ -290,8 +282,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
-        sqsUtil.log( "API - " + appRequest.params[ 0 ] );
-
         apiQuery = appRequest.query;
         apiQuery.crumb = sqsMiddleware.getCrumb();
 
@@ -313,8 +303,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Config
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "config" ) {
-        sqsUtil.log( "CONFIG - Author your content!" );
-
         appResponse.redirect( (serverConfig.siteurl + "/config/") );
 
         return;
@@ -322,8 +310,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Logout
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "logout" ) {
-        sqsUtil.log( "AUTH - Logout of Squarespace!" );
-
         sqsUser = null;
 
         appResponse.redirect( "/" );
@@ -333,8 +319,6 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Authentication
     if ( !sqsUser ) {
-        sqsUtil.log( "AUTH - Login to Squarespace!" );
-
         appResponse.status( 200 ).send( loginHTML );
 
         return;
@@ -342,9 +326,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Login expired
     if ( (Date.now() - sqsTimeOfLogin) >= sqsTimeLoggedIn ) {
-        sqsUtil.log( "AUTH EXPIRED - Logout of Squarespace!" );
-
-        appResponse.redirect( "/logout" );
+        appResponse.redirect( "/logout/" );
 
         return;
     }
@@ -353,15 +335,10 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     checkFolder = getFolderRoot( appRequest.params[ 0 ] );
 
     if ( checkFolder.folder ) {
-        sqsUtil.log( "FOLDER ROOT - " + appRequest.params[ 0 ] );
-
         appResponse.redirect( checkFolder.redirect );
 
         return;
     }
-
-    // Log URI
-    sqsUtil.log( "GET - " + appRequest.params[ 0 ] );
 
     // Run the template compiler
     sqsTemplate.refresh();
@@ -386,8 +363,6 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
         };
 
     if ( !data.email || !data.password ) {
-        sqsUtil.log( "AUTH - Email AND Password required." );
-
         appResponse.send( loginHTML );
 
         return;
@@ -425,13 +400,13 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "ERROR - " + error );
+                    sqsUtil.log( "Server.error: " + error );
                 }
             });
 
         } else {
             // Handle errors
-            sqsUtil.log( "ERROR - " + error );
+            sqsUtil.log( "Server.error: " + error );
 
             // Reload login
             appResponse.redirect( "/" );
@@ -543,7 +518,7 @@ startServer = function () {
     expressApp.listen( expressApp.get( "port" ) );
 
     // Log that the server is running
-    sqsUtil.log( ("Running on Port:" + expressApp.get( "port" )) );
+    sqsUtil.log( ("Server.port: " + expressApp.get( "port" )) );
 };
 
 
@@ -574,34 +549,34 @@ module.exports = {
         processArguments( args, function () {
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
-                sqsUtil.log( "LOAD - Login" );
+                //sqsUtil.log( "LOAD - Login" );
 
                 loginHTML = sqsUtil.packStr( data );
             });
 
             // Prefetch the 404 page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/404.html" ), function ( data ) {
-                sqsUtil.log( "LOAD - 404" );
+                //sqsUtil.log( "LOAD - 404" );
 
                 fourOhFourHTML = sqsUtil.packStr( data );
             });
 
             // Preload the sqs-cache
-            sqsCache.preload( function () {} );
+            sqsCache.preload(function () {
+                // Preload and process the template
+                sqsTemplate.preload();
+                sqsTemplate.compile(function () {
+                    // Watch for template changes
+                    sqsTemplate.watch();
 
-            // Preload and process the template
-            sqsTemplate.load();
-            sqsTemplate.preload(function () {
-                // Watch for template changes
-                sqsTemplate.watch();
-
-                startServer();
+                    startServer();
+                });
             });
 
             // Watch for changes to template.conf and reload it
             fs.watchFile( templateConfigPath, function () {
                 sqsUtil.readJson( templateConfigPath, function ( data ) {
-                    sqsUtil.log( "WATCH - Template.Conf Updated" );
+                    sqsUtil.log( "Server.watch: template.conf updated" );
 
                     setTemplateConfig( data );
                 });

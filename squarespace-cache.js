@@ -22,7 +22,7 @@ util.isFile( root, function ( exists ) {
 // Export
 module.exports = {
     set: function ( key, val ) {
-        util.log( "Cache.set", key );
+        //util.log( "Cache.set", key );
 
         var write = rJson.test( key ) ? util.writeJson : util.writeFile,
             value = rJson.test( key ) ? val : util.packStr( val );
@@ -33,13 +33,13 @@ module.exports = {
     },
 
     get: function ( key ) {
-        util.log( "Cache.get", key );
+        //util.log( "Cache.get", key );
 
         return (key ? cache[ key ] : cache);
     },
 
     remove: function ( key ) {
-        util.log( "Cache.remove", key );
+        //util.log( "Cache.remove", key );
 
         delete cache[ key ];
 
@@ -47,7 +47,7 @@ module.exports = {
     },
 
     clear: function () {
-        util.log( "Cache.clear" );
+        //util.log( "Cache.clear" );
 
         cache = {};
 
@@ -61,7 +61,7 @@ module.exports = {
 
                 function getFile() {
                     if ( !files.length ) {
-                        util.log( "Cache.preload" );
+                        util.log( "Cache.preloaded" );
 
                         cb();
 
