@@ -44,7 +44,7 @@ var path = require( "path" ),
     directories = {},
     config = {},
     scripts = [],
-    siteCss = null,
+    siteCss = "",
     templates = {
         regions: {},
         collections: {},
@@ -650,6 +650,8 @@ compileCollections = function ( cb ) {
  *
  */
 compileStylesheets = function ( cb ) {
+    siteCss = "";
+
     var styles = [{
         name: "reset.css",
         path: path.join( directories.styles, "reset.css" )
