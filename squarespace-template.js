@@ -436,6 +436,8 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         }
     }
 
+    console.log( "queries", queries );
+
     function handleDone() {
         // Add token scripts back into the template
         for ( i = scripts.length; i--; ) {
@@ -479,7 +481,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             key += "-category--" + query.queryData.category;
         }
 
-        key = (cache + ".json");
+        key = (key + ".json");
         cache = sqsCache.get( key );
 
         // Cached?
