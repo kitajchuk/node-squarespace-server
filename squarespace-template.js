@@ -436,8 +436,6 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         }
     }
 
-    console.log( "queries", queries );
-
     function handleDone() {
         // Add token scripts back into the template
         for ( i = scripts.length; i--; ) {
