@@ -5,7 +5,7 @@ node-squarespace-server
 
 
 ### Release
-- [0.2.0 - The latest and greatest](https://github.com/kitajchuk/node-squarespace-server/wiki/Release-0.2.0)
+- [0.2.3 - The latest and greatest](https://github.com/kitajchuk/node-squarespace-server/wiki/Release-0.2.0)
 
 
 ### Installation
