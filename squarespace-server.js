@@ -29,7 +29,7 @@ var bodyParser = require( "body-parser" ),
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
-    version = "0.1.31",
+    version = "0.2.4",
     loginHTML = "",
     fourOhFourHTML = "",
 
