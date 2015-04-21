@@ -5,7 +5,8 @@ node-squarespace-server
 
 
 ### Release
-- [0.2.3 - The latest and greatest](https://github.com/kitajchuk/node-squarespace-server/wiki/Release-0.2.0)
+***There was a rendering bug in the 0.2.3 release. Updating is recommended.***
+- [0.2.4 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 
 ### Installation
