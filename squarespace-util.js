@@ -161,34 +161,36 @@ getAttrObj = function ( elem ) {
     var attrs = elem.match( /(\w+)=("[^<>"]*"|'[^<>']*'|\w+)/g ),
         obj = {};
 
-    for ( var i = attrs.length; i--; ) {
-        var attr = attrs[ i ].split( "=" ),
-            val = attr[ 1 ].replace( /\'|\"/g, "" );
+    if ( attrs ) {
+        for ( var i = attrs.length; i--; ) {
+            var attr = attrs[ i ].split( "=" ),
+                val = attr[ 1 ].replace( /\'|\"/g, "" );
 
-        // Normalize values
+            // Normalize values
 
-        // Empty ?
-        // Skip empties, they are `undefined`
-        if ( val === "" ) {
-            continue;
+            // Empty ?
+            // Skip empties, they are `undefined`
+            if ( val === "" ) {
+                continue;
+            }
+
+            // False ?
+            if ( val === "false" ) {
+                val = false;
+            }
+
+            // True ?
+            if ( val === "true" ) {
+                val = true;
+            }
+
+            // Numeric ?
+            if ( phpjs.is_numeric( val ) ) {
+                val = parseInt( val, 10 );
+            }
+
+            obj[ attr[ 0 ] ] = val;
         }
-
-        // False ?
-        if ( val === "false" ) {
-            val = false;
-        }
-
-        // True ?
-        if ( val === "true" ) {
-            val = true;
-        }
-
-        // Numeric ?
-        if ( phpjs.is_numeric( val ) ) {
-            val = parseInt( val, 10 );
-        }
-
-        obj[ attr[ 0 ] ] = val;
     }
 
     return obj;
