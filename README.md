@@ -5,8 +5,14 @@ node-squarespace-server
 
 
 ### Release
-***There was a rendering bug in the 0.2.3 release. Updating is recommended.***
-- [0.2.4 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+***Using the latest is always recommended.***
+- [0.2.6 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+
+
+### Issues
+***Sandbox trial accounts have not been working.***
+
+This is possibly due to a change in Squarespace's platform. It's extremely difficult to debug, and the root cause has not yet been sussed out. [This thread](https://github.com/kitajchuk/node-squarespace-server/issues/101#issuecomment-113829240) documents some of what this issue is. If you're having issues related to this, unfortunately the only way to utilize the node server is to upgrade your plan with Squarespace.
 
 
 ### Installation
