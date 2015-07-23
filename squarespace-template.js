@@ -679,10 +679,10 @@ compileStylesheets = function ( cb ) {
                     sqsUtil.readFile( style.path, function ( data ) {
                         if ( rLess.test( style.name ) ) {
                             less.render( data, function ( error, css ) {
-                                if ( error == null ) {
+                                if ( error === null ) {
                                     siteCss += css;
                                 } else {
-                                    sqsUtil.log("Error compiling " + style.name + ": " + error.message)
+                                    sqsUtil.log("Error compiling " + style.name + ": " + error.message);
                                 }
 
                                 read();
