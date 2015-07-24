@@ -2,7 +2,7 @@
     "title": "Node Squarespace Server",
     "name": "node-squarespace-server",
     "description": "A local Squarespace development server in node.js for folks using the developer platform.",
-    "version": "0.2.6",
+    "version": "0.2.7",
     "homepage": "https://github.com/kitajchuk/node-squarespace-server",
     "readmeFilename": "README.md",
     "contributors": [
