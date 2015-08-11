@@ -29,7 +29,7 @@ var bodyParser = require( "body-parser" ),
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
-    version = "0.2.6",
+    version = "0.2.8",
     loginHTML = "",
     fourOhFourHTML = "",
 
@@ -158,6 +158,28 @@ renderResponse = function ( appRequest, appResponse ) {
 
         sqsCache.remove( (cacheName + ".html") );
         sqsCache.remove( (cacheName + ".json") );
+    }
+
+    // Search?
+    if ( slugged === "search" ) {
+        if ( cacheHtml ) {
+            appResponse.status( 200 ).send( cacheHtml );
+
+        } else {
+            sqsMiddleware.getHtml( url, qrs, function ( error, data ) {
+                if ( !error ) {
+                    appResponse.status( 200 ).send( data.html );
+
+                    sqsCache.set( (cacheName + ".html"), data.html );
+
+                } else {
+                    // Handle errors
+                    sqsUtil.log( "Server.error: " + error );
+                }
+            });
+        }
+
+        return;
     }
 
     // Cache?
