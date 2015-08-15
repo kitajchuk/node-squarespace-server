@@ -9,12 +9,6 @@ node-squarespace-server
 - [0.2.8 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 
-### Issues
-***Sandbox trial accounts have not been working.***
-
-This is possibly due to a change in Squarespace's platform. It's extremely difficult to debug, and the root cause has not yet been sussed out. [This thread](https://github.com/kitajchuk/node-squarespace-server/issues/101#issuecomment-113829240) documents some of what this issue is. If you're having issues related to this, unfortunately the only way to utilize the node server is to upgrade your plan with Squarespace.
-
-
 ### Installation
 ```shell
 npm install -g node-squarespace-server
@@ -104,7 +98,7 @@ This uses the [node-squarespace-middleware](https://github.com/kitajchuk/node-sq
 
 
 ### Workflow
-You can use any front-end workflow you like when working with a custom Squarespace template. At the very least the separation of your source files and your actual template is recommended. I have developed a [grunt](http://gruntjs.com) workflow that bootstraps a [grunt-nautilus](https://github.com/kitajchuk/grunt-nautilus) based approach: [grunt-init-squarespace](https://github.com/kitajchuk/grunt-init-squarespace). At the very least, this is a good example of how to go about setting up your own workflow which keeps your source and template code separate.
+You can use any front-end workflow you like when working with a custom Squarespace template. At the very least the separation of your source files and your actual template is recommended. I have developed a [grunt](http://gruntjs.com) workflow that bootstraps a [grunt-nautilus](https://github.com/kitajchuk/grunt-nautilus) based approach: [grunt-init-squarespace](https://github.com/kitajchuk/grunt-init-squarespace). At the very least, this is a good example of how to go about setting up your own workflow which keeps your source and template code separate. I have been working on [grunt-nautilus-squarespace-boilerplate](https://github.com/kitajchuk/grunt-nautilus-squarespace-boilerplate) as a better starting place, try it out if it fits your style.
 
 
 
