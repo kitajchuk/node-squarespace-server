@@ -9,6 +9,8 @@ var path = require( "path" ),
     uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
 
+    rMetaLeft = /\{\.meta-left\}/g,
+    rMetaRight = /\{\.meta-right\}/g,
     rSlash = /^\/|\/$/g,
     rJsonT = /^\{.*?\}$/,
     rScripts = /<script.*?\>(.*?)<\/script\>/g,
@@ -439,6 +441,9 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     function handleDone() {
         // Add token scripts back into the template
         for ( i = scripts.length; i--; ) {
+            // Allow {.meta-left} and {.meta-right}
+            scripts[ i ].script = scripts[ i ].script.replace( rMetaLeft, "{" ).replace( rMetaRight, "}" );
+
             rendered = rendered.replace( scripts[ i ].token, scripts[ i ].script );
         }
 
