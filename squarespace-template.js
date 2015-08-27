@@ -23,7 +23,9 @@ var path = require( "path" ),
     rList = /\.list$/,
     rLess = /\.less$/,
     rCss = /\.css$/,
+    rJs = /\.js/,
     rBlock = /\.block$/,
+    rPage = /\.page$/,
     rJson = /\{@\|json.*?\}/,
     rBodyTag = /<body.*?\>/,
     rSQSQuery = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/,
@@ -50,7 +52,8 @@ var path = require( "path" ),
     templates = {
         regions: {},
         collections: {},
-        blocks: {}
+        blocks: {},
+        pages: {}
     },
     layoutHTML = "",
     updating = {},
@@ -58,6 +61,7 @@ var path = require( "path" ),
     sqsMiddleware = require( "node-squarespace-middleware" ),
     sqsUtil = require( "./squarespace-util" ),
     sqsBlocktypes = require( "./squarespace-blocktypes" ),
+    sqsCollectiontypes = require( "./squarespace-collectiontypes" ),
     sqsJsonTemplate = require( "node-squarespace-jsont" ),
     sqsCache = require( "./squarespace-cache" ),
 
@@ -94,13 +98,14 @@ compile = function ( cb ) {
     function done() {
         compiled++;
 
-        if ( compiled === 4 ) {
+        if ( compiled === 5 ) {
             replaceAll();
 
             cb();
         }
     }
 
+    compilePages( done );
     compileBlocks( done );
     compileRegions( done );
     compileCollections( done );
@@ -132,7 +137,7 @@ watch = function () {
 
             sqsUtil.log( ("Template.watch: " + filename + " updated") );
 
-            if ( rItemOrList.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) ) {
+            if ( rItemOrList.test( filename ) || rPage.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) || rJs.test( filename ) ) {
                 compile(function () {
                     doneWatch( filename );
                 });
@@ -141,9 +146,11 @@ watch = function () {
     }
 
     fs.watch( process.cwd(), onWatch );
+    fs.watch( directories.pages, onWatch );
     fs.watch( directories.blocks, onWatch );
     fs.watch( directories.collections, onWatch );
     fs.watch( directories.styles, onWatch );
+    fs.watch( directories.scripts, onWatch );
 },
 
 
@@ -378,6 +385,13 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
         // This wraps the matched collection template with the default or set region
         rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.collections[ templateKey ] );
+
+    // 0.2 => Template is a static page
+    } else if ( rPage.test( templateKey ) ) {
+        regionKey = ((pageJson.collection.regionName || "default") + ".region");
+
+        // This wraps the matched page template with the default or set region
+        rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.pages[ templateKey ] );
 
     } else {
         rendered += templates.regions[ templateKey ];
@@ -649,6 +663,41 @@ compileCollections = function ( cb ) {
 
 /**
  *
+ * @method compilePages
+ * @param {function} cb The callback when done
+ * @private
+ *
+ */
+compilePages = function ( cb ) {
+    sqsUtil.readDir( directories.pages, function ( files ) {
+        function read() {
+            if ( !files.length ) {
+                cb();
+
+            } else {
+                var page = files.pop(),
+                    file = path.join( directories.pages, page );
+
+                if ( !rPage.test( page ) ) {
+                    read();
+                    return;
+                }
+
+                sqsUtil.readFile( file, function ( data ) {
+                    templates.pages[ page ] = sqsUtil.packStr( data );
+
+                    read();
+                });
+            }
+        }
+
+        read();
+    });
+},
+
+
+/**
+ *
  * @method compileStylesheets
  * @param {function} cb The callback when done
  * @private
@@ -764,9 +813,15 @@ getTemplateKey = function ( pageJson ) {
     } else if ( pageJson.items ) {
         template = (typeName + ".list");
 
-    // Handle page
+    // Handle collection root
     } else {
-        template = (regionName + ".region");
+        // Handle static page
+        if ( pageJson.collection.type === sqsCollectiontypes.TEMPLATE_PAGE ) {
+            template = (typeName + ".page");
+
+        } else {
+            template = (regionName + ".region");
+        }
     }
 
     return template;
