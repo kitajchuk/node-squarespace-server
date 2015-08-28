@@ -259,6 +259,17 @@ replaceBlocks = function () {
             }
         }
     }
+
+    for ( i in templates.pages ) {
+        while ( matched = templates.pages[ i ].match( rBlockIncs ) ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                block = matched[ j ].replace( rBlockTags, "" );
+                block = templates.blocks[ block ];
+
+                templates.pages[ i ] = templates.pages[ i ].replace( matched[ j ], block );
+            }
+        }
+    }
 },
 
 
@@ -303,6 +314,24 @@ replaceScripts = function () {
                     });
 
                     templates.collections[ i ] = templates.collections[ i ].replace( matched[ j ], token );
+                }
+            }
+        }
+    }
+
+    for ( var i in templates.pages ) {
+        matched = templates.pages[ i ].match( rScripts );
+
+        if ( matched ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                if ( !rJson.test( matched[ j ] ) ) {
+                    token = sqsUtil.getToken();
+                    scripts.push({
+                        token: token,
+                        script: matched[ j ]
+                    });
+
+                    templates.pages[ i ] = templates.pages[ i ].replace( matched[ j ], token );
                 }
             }
         }
