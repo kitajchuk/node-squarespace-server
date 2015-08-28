@@ -6,7 +6,12 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.2.11 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.2.12 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+
+#### Recent Updates
+- Support folder-navigation tag
+- Support static pages
+- Support system search page
 
 
 ### Installation
