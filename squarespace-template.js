@@ -9,6 +9,7 @@ var path = require( "path" ),
     uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
 
+    rIndexFolder = /index|folder/g,
     rMetaLeft = /\{\.meta-left\}/g,
     rMetaRight = /\{\.meta-right\}/g,
     rSlash = /^\/|\/$/g,
@@ -31,6 +32,7 @@ var path = require( "path" ),
     rSQSQuery = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/,
     rSQSQueryG = /(<squarespace:query.*?\>)(.*?)(<\/squarespace:query\>)/g,
     rSQSNavis = /<squarespace:navigation(.*?)\/\>/g,
+    rSQSFolderNavis = /<squarespace:folder-navigation(.*?)\/\>/g,
     rSQSBlockFields = /<squarespace:block-field(.*?)\/\>/g,
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
     rSQSClickThroughUrl = /\/s\/(.*?)\.\w+.*?/g,
@@ -454,6 +456,9 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
     // Render Navigations from pageJson
     rendered = replaceNavigations( rendered, pageJson );
+
+    // Render Folder Navigations from pageJson
+    rendered = replaceFolderNavigations( rendered, pageJson );
 
     // Render full clickThroughUrl's
     rendered = replaceClickThroughUrls( rendered );
@@ -926,17 +931,12 @@ replaceNavigations = function ( rendered, pageJson ) {
             items: []
         },
         block,
-        items,
         attrs,
         matched,
         template,
         i,
         iLen,
-        j,
-        k,
-        kLen,
-        l,
-        lLen;
+        j;
 
     // SQS Navigations
     matched = rendered.match( rSQSNavis );
@@ -950,49 +950,10 @@ replaceNavigations = function ( rendered, pageJson ) {
             for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
                 // Ensure the identifier is for THIS navigation ID
                 if ( config.server.siteData.siteLayout.layout[ j ].identifier === attrs.navigationId ) {
-                    items = [];
-
-                    for ( k = 0, kLen = config.server.siteData.siteLayout.layout[ j ].links.length; k < kLen; k++ ) {
-                        var link = config.server.siteData.siteLayout.layout[ j ].links[ k ],
-                            item = null;
-
-                        // Render item with a collection ID
-                        if ( link.collectionId ) {
-                            item = {
-                                active: (link.collectionId === pageJson.collection.id),
-                                folderActive: (link.collectionId === pageJson.collection.id),
-                                collection: lookupCollectionById( link.collectionId )
-                            };
-
-                            // Check for folder submenu items
-                            if ( link.children ) {
-                                item.items = [];
-
-                                for ( l = 0, lLen = link.children.length; l < lLen; l++ ) {
-                                    item.items.push({
-                                        active: (link.children[ l ].collectionId === pageJson.collection.id),
-                                        folderActive: (link.children[ l ].collectionId === pageJson.collection.id),
-                                        collection: lookupCollectionById( link.children[ l ].collectionId )
-                                    });
-
-                                    // Need active folder when collection in a folder is active
-                                    if ( link.children[ l ].collectionId === pageJson.collection.id ) {
-                                        item.active = (link.children[ l ].collectionId === pageJson.collection.id);
-                                        item.folderActive = (link.children[ l ].collectionId === pageJson.collection.id);
-                                    }
-                                }
-                            }
-
-                        } else {
-                            item = sqsUtil.copy( link );
-                            item.active = (link.title === pageJson.collection.title);
-                            item.folderActive = (link.title === pageJson.collection.title);
-                        }
-
-                        items.push( item );
-                    }
-
-                    context.items = items;
+                    context.items = getNavigationContextItems(
+                        config.server.siteData.siteLayout.layout[ j ].links,
+                        pageJson
+                    );
                 }
             }
 
@@ -1003,6 +964,145 @@ replaceNavigations = function ( rendered, pageJson ) {
     }
 
     return rendered;
+},
+
+
+/**
+ *
+ * @method replaceFolderNavigations
+ * @param {string} rendered The template rendering
+ * @param {string} pageJson The JSON for the page
+ * @returns {string}
+ * @private
+ *
+ */
+replaceFolderNavigations = function ( rendered, pageJson ) {
+    var context = {
+            active: false,
+            folderActive: false,
+            website: pageJson.website,
+            items: []
+        },
+        block,
+        attrs,
+        matched,
+        template,
+        i,
+        iLen,
+        j,
+
+        nav,
+        links,
+        link,
+
+        k,
+        l,
+
+        child;
+
+    // SQS Folder Navigations
+    matched = rendered.match( rSQSFolderNavis );
+
+    if ( matched ) {
+        for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
+            attrs = sqsUtil.getAttrObj( matched[ i ] );
+            block = (attrs.template + ".block");
+            template = templates.blocks[ block ];
+
+            // Iterate over SiteLayout indexes/folders
+            // Find index/folder that has current collection as child
+            // Use that children array to render the navigation
+
+            // Iterates over ALL registered navigations in a site
+            for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
+                nav = config.server.siteData.siteLayout.layout[ j ];
+                links = nav.links;
+
+                for ( k = links.length; k--; ) {
+                    link = links[ k ];
+
+                    if ( rIndexFolder.test( link.typeName ) ) {
+                        for ( l = links[ k ].children.length; l--; ) {
+                            child = links[ k ].children[ l ];
+
+                            if ( child.collectionId === pageJson.collection.id ) {
+                                context.items = getNavigationContextItems(
+                                    links[ k ].children,
+                                    pageJson
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            template = sqsJsonTemplate.render( template, context );
+
+            rendered = rendered.replace( matched[ i ], template );
+        }
+    }
+
+    return rendered;
+},
+
+
+/**
+ *
+ * @method getNavigationContextItems
+ * @param {array} links The list of links for a navigation tree
+ * @param {string} pageJson The JSON for the page
+ * @returns {array}
+ * @private
+ *
+ */
+getNavigationContextItems = function ( links, pageJson ) {
+    var items = [],
+        i,
+        iLen,
+        j,
+        jLen;
+
+    for ( i = 0, iLen = links.length; i < iLen; i++ ) {
+        var link = links[ i ],
+            item = null;
+
+        // Render item with a collection ID
+        if ( link.collectionId ) {
+            item = {
+                active: (link.collectionId === pageJson.collection.id),
+                folderActive: (link.collectionId === pageJson.collection.id),
+                collection: lookupCollectionById( link.collectionId )
+            };
+
+            // Check for folder submenu items
+            if ( link.children ) {
+                item.items = [];
+
+                for ( j = 0, jLen = link.children.length; j < jLen; j++ ) {
+                    item.items.push({
+                        active: (link.children[ j ].collectionId === pageJson.collection.id),
+                        folderActive: (link.children[ j ].collectionId === pageJson.collection.id),
+                        collection: lookupCollectionById( link.children[ j ].collectionId )
+                    });
+
+                    // Need active folder when collection in a folder is active
+                    if ( link.children[ j ].collectionId === pageJson.collection.id ) {
+                        item.active = (link.children[ j ].collectionId === pageJson.collection.id);
+                        item.folderActive = (link.children[ j ].collectionId === pageJson.collection.id);
+                    }
+                }
+            }
+
+        } else {
+            item = sqsUtil.copy( link );
+            item.active = (link.title === pageJson.collection.title);
+            item.folderActive = (link.title === pageJson.collection.title);
+        }
+
+        items.push( item );
+    }
+
+    return items;
 },
 
 
