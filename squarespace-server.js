@@ -217,7 +217,7 @@ renderResponse = function ( appRequest, appResponse ) {
                 if ( data.html.status === 404 || data.json.status === 404 ) {
                     appResponse.status( 200 ).send( fourOhFourHTML );
 
-                    sqsUtil.log( "Server.404" );
+                    sqsUtil.log( "Server.404: " + url );
 
                     return;
                 }
