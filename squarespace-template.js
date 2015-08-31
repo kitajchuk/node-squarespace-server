@@ -95,23 +95,36 @@ preload = function () {
  *
  */
 compile = function ( cb ) {
-    var compiled = 0;
+    var compiled = 0,
+        methods = [
+            compileBlocks,
+            compileRegions,
+            compileCollections,
+            compileStylesheets
+        ];
+
+    // Maybe a template won't have static pages ?
+    if ( fs.existsSync( directories.pages ) ) {
+        methods.push( compilePages );
+    }
 
     function done() {
         compiled++;
 
-        if ( compiled === 5 ) {
+        if ( compiled === methods.length ) {
             replaceAll();
 
             cb();
         }
     }
 
-    compilePages( done );
-    compileBlocks( done );
-    compileRegions( done );
-    compileCollections( done );
-    compileStylesheets( done );
+
+    for ( var i = 0; i < methods.length; i++ ) {
+        methods[ i ].call(
+            null,
+            done
+        );
+    }
 },
 
 
@@ -135,11 +148,11 @@ watch = function () {
 
     function onWatch( event, filename ) {
         if ( !updating[ filename ] ) {
-            updating[ filename ] = true;
-
-            sqsUtil.log( ("Template.watch: " + filename + " updated") );
-
             if ( rItemOrList.test( filename ) || rPage.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) || rJs.test( filename ) ) {
+                updating[ filename ] = true;
+
+                sqsUtil.log( ("Template.watch: " + filename + " updated") );
+
                 compile(function () {
                     doneWatch( filename );
                 });
@@ -148,11 +161,15 @@ watch = function () {
     }
 
     fs.watch( process.cwd(), onWatch );
-    fs.watch( directories.pages, onWatch );
     fs.watch( directories.blocks, onWatch );
     fs.watch( directories.collections, onWatch );
     fs.watch( directories.styles, onWatch );
     fs.watch( directories.scripts, onWatch );
+
+    // Maybe a template won't have static pages ?
+    if ( fs.existsSync( directories.pages ) ) {
+        fs.watch( directories.pages, onWatch );
+    }
 },
 
 
