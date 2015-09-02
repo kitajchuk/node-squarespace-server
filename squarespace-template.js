@@ -443,8 +443,16 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     if ( rItemOrList.test( templateKey ) ) {
         regionKey = ((pageJson.collection.regionName || "default") + ".region");
 
-        // This wraps the matched collection template with the default or set region
-        rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.collections[ templateKey ] );
+        // Possibly the regionName isn't really what we want ?
+        // It would seem that when using galleries, the regionKey is no what we're looking for.
+        // In this case, just assume the collection template and we don't have to replace mainContent.
+        if ( !templates.regions[ regionKey ] ) {
+            rendered += templates.collections[ templateKey ];
+
+        } else {
+            // This wraps the matched collection template with the default or set region
+            rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.collections[ templateKey ] );
+        }
 
     // 0.2 => Template is a static page
     } else if ( rPage.test( templateKey ) ) {

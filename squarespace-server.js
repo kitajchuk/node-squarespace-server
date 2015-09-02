@@ -29,7 +29,7 @@ var bodyParser = require( "body-parser" ),
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
-    version = "0.3.0",
+    version = "0.3.1",
     loginHTML = "",
     fourOhFourHTML = "",
 
@@ -464,6 +464,7 @@ printUsage = function () {
     console.log( "sqs --forever    Start server using forever" );
     console.log( "sqs --fornever   Stop server started with forever" );
     console.log( "sqs --port=XXXX  Use the specified port" );
+    console.log( "sqs --quiet      Silence the logger" );
     console.log();
     console.log( "Examples:" );
     console.log( "sqs server --port=8000" );
