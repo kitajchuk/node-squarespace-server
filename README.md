@@ -6,9 +6,10 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.2.12 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.3.0 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
+- Integrate better logging using [node-squarespace-logger](https://github.com/kitajchuk/node-squarespace-logger)
 - Support folder-navigation tag
 - Support static pages
 - Support system search page
@@ -80,6 +81,9 @@ sqs --fornever
 
 # Run the server on a specific port
 sqs server --port=8000
+
+# Silence the server logging
+sqs server --quiet
 
 # Bust local cache
 sqs buster
