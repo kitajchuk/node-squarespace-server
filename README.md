@@ -6,7 +6,7 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.3.0 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.3.1 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
 - Integrate better logging using [node-squarespace-logger](https://github.com/kitajchuk/node-squarespace-logger)
