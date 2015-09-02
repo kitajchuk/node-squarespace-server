@@ -1,5 +1,6 @@
 var fse = require( "fs-extra" ),
     fs = require( "fs" ),
+    phpjs = require( "phpjs" ),
 
 
 isFunc = function ( fn ) {

@@ -4,7 +4,7 @@ var fs = require( "fs" ),
     cwd = process.cwd(),
     args = [].slice.call( process.argv, 2 ),
     path = require( "path" ),
-    exec = require( "exec" ),
+    exec = require( "child_process" ).exec,
     util = require( "../squarespace-util" ),
     server = require( "../squarespace-server" ), 
     config = path.join( cwd, "template.conf" ),
@@ -37,7 +37,7 @@ if ( versionIdx !== -1 ) {
     // Splice --forever flag from the argument list
     args.splice( foreverIdx, 1 );
 
-    exec( (forever + " -a --uid 'node-squarespace-server' start " + startup + " " + args.join( " " ) ), function ( error, stdout ) {} );
+    exec( (forever + " -a --uid 'node-squarespace-server' start " + startup + " " + args.join( " " ) ), function ( error, stdout, stderr ) {} );
 
 // Stop server started with forever process
 } else if ( forneverIdx !== -1 ) {
@@ -46,7 +46,7 @@ if ( versionIdx !== -1 ) {
     // Splice --fornever flag from the argument list
     args.splice( forneverIdx, 1 );
 
-    exec( (forever + " stop node-squarespace-server"), function ( error, stdout ) {} );
+    exec( (forever + " stop node-squarespace-server"), function ( error, stdout, stderr ) {} );
 
 // Standard node process
 } else {
