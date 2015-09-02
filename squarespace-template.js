@@ -60,6 +60,8 @@ var path = require( "path" ),
     layoutHTML = "",
     updating = {},
 
+    // Default to unique logger incase setLogger isn't called
+    sqsLogger = require( "node-squarespace-logger" ),
     sqsMiddleware = require( "node-squarespace-middleware" ),
     sqsUtil = require( "./squarespace-util" ),
     sqsBlocktypes = require( "./squarespace-blocktypes" ),
@@ -80,8 +82,6 @@ var path = require( "path" ),
  */
 preload = function () {
     sqsUtil.readFile( path.join( __dirname, "tpl/layout.html" ), function ( data ) {
-        //sqsUtil.log( "LOAD - Layout" );
-
         layoutHTML = sqsUtil.packStr( data );
     });
 },
@@ -136,7 +136,7 @@ compile = function ( cb ) {
  */
 watch = function () {
     function doneWatch( filename ) {
-        sqsUtil.log( "Template.reloaded" );
+        sqsLogger.log( "template", "Reloaded local template" );
 
         replaceAll();
 
@@ -151,7 +151,7 @@ watch = function () {
             if ( rItemOrList.test( filename ) || rPage.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) || rJs.test( filename ) ) {
                 updating[ filename ] = true;
 
-                sqsUtil.log( ("Template.watch: " + filename + " updated") );
+                sqsLogger.log( "template", ("Updated template file " + filename) );
 
                 compile(function () {
                     doneWatch( filename );
@@ -196,6 +196,18 @@ refresh = function () {
     //scripts = [];
     sqsHeaders = [];
     sqsFooters = [];
+},
+
+
+/**
+ *
+ * @method setLogger
+ * @param {object} logger The log module
+ * @public
+ *
+ */
+setLogger = function ( logger ) {
+    sqsLogger = logger;
 },
 
 
@@ -573,7 +585,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "Server.error: " + error );
+                    sqsLogger.log( "error", ("Squarespace:query request error => " + error) );
                 }
             });
         }
@@ -786,8 +798,9 @@ compileStylesheets = function ( cb ) {
                             less.render( data, function ( error, css ) {
                                 if ( error === null ) {
                                     siteCss += css;
+
                                 } else {
-                                    sqsUtil.log("Error compiling " + style.name + ": " + error.message);
+                                    sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
                                 }
 
                                 read();
@@ -1266,7 +1279,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "Server.error: " + error );
+                    sqsLogger.log( "error", ("Error requesting block widget html => " + error) );
 
                     // Skip it for now...
                     if ( !blocks.length ) {
@@ -1348,7 +1361,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                     } else {
                         // Handle errors
-                        sqsUtil.log( "Server.error: " + error );
+                        sqsLogger.log( "error", ("Error requesting block json => " + error) );
 
                         if ( !matched.length ) {
                             callback( rendered );
@@ -1402,6 +1415,7 @@ module.exports = {
     setDirs: setDirs,
     setUser: setUser,
     setConfig: setConfig,
+    setLogger: setLogger,
     getSiteCss: getSiteCss,
     replaceBlocks: replaceBlocks,
     replaceScripts: replaceScripts,

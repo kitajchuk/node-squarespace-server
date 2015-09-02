@@ -1,55 +1,56 @@
 {
-    "title": "Node Squarespace Server",
-    "name": "node-squarespace-server",
-    "description": "A local Squarespace development server in node.js for folks using the developer platform.",
-    "version": "0.2.13",
-    "homepage": "https://github.com/kitajchuk/node-squarespace-server",
-    "readmeFilename": "README.md",
-    "contributors": [
-        {
-            "name": "Brandon Kitajchuk",
-            "email": "kitajchuk@gmail.com",
-            "url": "http://blkpdx.com"
-        }
-    ],
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/kitajchuk/node-squarespace-server.git"
-    },
-    "bugs": {
-        "url": "https://github.com/kitajchuk/node-squarespace-server/issues"
-    },
-    "licenses": [
-        {
-            "type": "MIT",
-            "url": "https://github.com/kitajchuk/node-squarespace-server/blob/master/LICENSE"
-        }
-    ],
-    "main": "squarespace-startup",
-    "directories": {
-        "bin": "./bin"
-    },
-    "bin": {
-        "sqs": "./bin/squarespace-server"
-    },
-    "dependencies": {
-        "node-squarespace-jsont": "~0.1.5",
-        "node-squarespace-middleware": "~0.1.3",
-        "request": "~2",
-        "express": "~4.9",
-        "slug": "~0.7",
-        "less": "~1.7",
-        "uglifycss": "0.0.9",
-        "body-parser": "~1.9",
-        "cookie": "~0.1",
-        "fs-extra": "~0.12",
-        "forever": "~0.11",
-        "mustache": "~0.8",
-        "phpjs": "~1.3"
-    },
-    "keywords": [
-        "squarespace",
-        "json-template",
-        "express"
-    ]
+  "title": "Node Squarespace Server",
+  "name": "node-squarespace-server",
+  "description": "A local Squarespace development server in node.js for folks using the developer platform.",
+  "version": "0.3.0",
+  "homepage": "https://github.com/kitajchuk/node-squarespace-server",
+  "readmeFilename": "README.md",
+  "contributors": [
+    {
+      "name": "Brandon Kitajchuk",
+      "email": "kitajchuk@gmail.com",
+      "url": "http://blkpdx.com"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/kitajchuk/node-squarespace-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kitajchuk/node-squarespace-server/issues"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/kitajchuk/node-squarespace-server/blob/master/LICENSE"
+    }
+  ],
+  "main": "squarespace-startup",
+  "directories": {
+    "bin": "./bin"
+  },
+  "bin": {
+    "sqs": "./bin/squarespace-server"
+  },
+  "dependencies": {
+    "body-parser": "~1.9",
+    "cookie": "~0.1",
+    "express": "~4.9",
+    "forever": "~0.11",
+    "fs-extra": "~0.12",
+    "less": "~1.7",
+    "mustache": "~0.8",
+    "node-squarespace-jsont": "~0.1.5",
+    "node-squarespace-middleware": "~0.2",
+    "node-squarespace-logger": "~0.1",
+    "phpjs": "~1.3",
+    "request": "~2",
+    "slug": "~0.7",
+    "uglifycss": "0.0.9"
+  },
+  "keywords": [
+    "squarespace",
+    "json-template",
+    "express"
+  ]
 }

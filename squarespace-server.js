@@ -29,10 +29,11 @@ var bodyParser = require( "body-parser" ),
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
-    version = "0.2.13",
+    version = "0.3.0",
     loginHTML = "",
     fourOhFourHTML = "",
 
+    sqsLogger = require( "node-squarespace-logger" ),
     sqsMiddleware = require( "node-squarespace-middleware" ),
     sqsUtil = require( "./squarespace-util" ),
     sqsTemplate = require( "./squarespace-template" ),
@@ -174,7 +175,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "Server.error: " + error );
+                    sqsLogger.log( "error", ("Error requesting system search page => " + error) );
                 }
             });
         }
@@ -205,7 +206,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "Server.error: " + error );
+                    sqsLogger.log( "error", ("Error requesting page json => " + error) );
                 }
             });
         }
@@ -217,7 +218,7 @@ renderResponse = function ( appRequest, appResponse ) {
                 if ( data.html.status === 404 || data.json.status === 404 ) {
                     appResponse.status( 200 ).send( fourOhFourHTML );
 
-                    sqsUtil.log( "Server.404: " + url );
+                    sqsLogger.log( "warn", ("Request responded with server code 404 for => `" + url + "`") );
 
                     return;
                 }
@@ -231,7 +232,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
             } else {
                 // Handle errors
-                sqsUtil.log( "Server.error: " + error );
+                sqsLogger.log( "error", ("Error requesting page => " + error) );
             }
         });
     }
@@ -400,12 +401,19 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
     // Set user on external modules
     sqsTemplate.setUser( sqsUser );
 
+    sqsLogger.log( "info", "Logging into Squarespace..." );
+
     // Login to site
     sqsMiddleware.doLogin(function ( error, headers ) {
         if ( !error ) {
+            sqsLogger.log( "info", "...Logged in to Squarespace" );
+            sqsLogger.log( "info", "Fetching data from Squarespace..." );
+
             // Fetch site API data
             sqsMiddleware.getAPIData( function ( error, data ) {
                 if ( !error ) {
+                    sqsLogger.log( "info", "...Fetched data from Squarespace" );
+
                     // Store the site data needed
                     serverConfig.siteData = data;
 
@@ -422,13 +430,13 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsUtil.log( "Server.error: " + error );
+                    sqsLogger.log( "error", ("Error fetching data from Squarespace => " + error) );
                 }
             });
 
         } else {
             // Handle errors
-            sqsUtil.log( "Server.error: " + error );
+            sqsLogger.log( "error", ("Error logging into Squarespace => " + error) );
 
             // Reload login
             appResponse.redirect( "/" );
@@ -470,7 +478,7 @@ printUsage = function () {
  *
  */
 printVersion = function () {
-    sqsUtil.log( version );
+    sqsLogger.log( "info", ("Node Squarespace Server version " + version) );
     process.exit();
 },
 
@@ -504,10 +512,15 @@ processArguments = function ( args, cb ) {
         }
     }
 
+    // Silence is golden
+    if ( flags.quiet ) {
+        sqsLogger.log( "server", "Squarespace server running in the dark" );
+        sqsLogger.silence();
+    }
+
     // Order of operations
     if ( flags.version ) {
-        sqsUtil.log( version );
-        process.exit();
+        printVersion();
 
     } else if ( commands.buster ) {
         sqsCache.clear();
@@ -540,7 +553,7 @@ startServer = function () {
     expressApp.listen( expressApp.get( "port" ) );
 
     // Log that the server is running
-    sqsUtil.log( ("Server.port: " + expressApp.get( "port" )) );
+    sqsLogger.log( "server", ("Squarespace server running on port => " + expressApp.get( "port" )) );
 };
 
 
@@ -569,17 +582,17 @@ module.exports = {
         // Handle arguments
         // If Callback runs, start the server
         processArguments( args, function () {
+            // Pass the logger to other modules
+            sqsCache.setLogger( sqsLogger );
+            sqsTemplate.setLogger( sqsLogger );
+
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
-                //sqsUtil.log( "LOAD - Login" );
-
                 loginHTML = sqsUtil.packStr( data );
             });
 
             // Prefetch the 404 page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/404.html" ), function ( data ) {
-                //sqsUtil.log( "LOAD - 404" );
-
                 fourOhFourHTML = sqsUtil.packStr( data );
             });
 
@@ -598,9 +611,9 @@ module.exports = {
             // Watch for changes to template.conf and reload it
             fs.watchFile( templateConfigPath, function () {
                 sqsUtil.readJson( templateConfigPath, function ( data ) {
-                    sqsUtil.log( "Server.watch: template.conf updated" );
-
                     setTemplateConfig( data );
+
+                    sqsLogger.log( "template", "Reloaded template.conf json" );
                 });
             });
         });

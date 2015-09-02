@@ -8,15 +8,6 @@ isFunc = function ( fn ) {
 },
 
 
-log = function () {
-    var args = [].slice.call( arguments, 0 );
-
-    args.unshift( "> sqs-server:" );
-
-    console.log.apply( console, args );
-},
-
-
 packStr = function ( str ) {
     str = str.split( /\n|\r|\t|\v/ );
 
@@ -229,8 +220,8 @@ copyArr = function ( arr ) {
 
 // Export
 module.exports = {
-    log: log,
     isFile: isFile,
+    isFunc: isFunc,
     readDir: readDir,
     makeDir: makeDir,
     readJson: readJson,

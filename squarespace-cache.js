@@ -4,6 +4,9 @@
  *
  */
 var util = require( "./squarespace-util" ),
+
+    // Default to unique logger incase setLogger isn't called
+    logger = require( "node-squarespace-logger" ),
     path = require( "path" ),
     root = path.join( process.cwd(), ".sqs-cache" ),
     noop = function () {},
@@ -22,7 +25,7 @@ util.isFile( root, function ( exists ) {
 // Export
 module.exports = {
     set: function ( key, val ) {
-        //util.log( "Cache.set", key );
+        logger.log( "cache", ("Store local cache for key => " + key) );
 
         var write = rJson.test( key ) ? util.writeJson : util.writeFile,
             value = rJson.test( key ) ? val : util.packStr( val );
@@ -33,13 +36,13 @@ module.exports = {
     },
 
     get: function ( key ) {
-        //util.log( "Cache.get", key );
+        logger.log( "cache", ("Get local cache for key => " + key) );
 
         return (key ? cache[ key ] : cache);
     },
 
     remove: function ( key ) {
-        //util.log( "Cache.remove", key );
+        logger.log( "cache", ("Remove local cache for key => " + key) );
 
         delete cache[ key ];
 
@@ -47,7 +50,7 @@ module.exports = {
     },
 
     clear: function () {
-        //util.log( "Cache.clear" );
+        logger.log( "cache", "Clear local cache" );
 
         cache = {};
 
@@ -61,7 +64,7 @@ module.exports = {
 
                 function getFile() {
                     if ( !files.length ) {
-                        util.log( "Cache.preloaded" );
+                        logger.log( "cache", "Preloaded local cache" );
 
                         cb();
 
@@ -71,10 +74,6 @@ module.exports = {
 
                         read( path.join( root, file ), function ( data ) {
                             cache[ file ] = rJson.test( file ) ? data : util.packStr( data );
-
-                            //process.stdout.clearLine();
-                            //process.stdout.cursorTo( 0 );
-                            //process.stdout.write( ((total - files.length) / total) * 100 + "%" );
 
                             getFile();
                         });
@@ -87,5 +86,9 @@ module.exports = {
                 cb();
             }
         });
+    },
+
+    setLogger: function ( lgr ) {
+        logger = lgr;
     }
 };
