@@ -301,6 +301,17 @@ replaceBlocks = function () {
             }
         }
     }
+
+    for ( i in templates.blocks ) {
+        while ( matched = templates.blocks[ i ].match( rBlockIncs ) ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                block = matched[ j ].replace( rBlockTags, "" );
+                block = templates.blocks[ block ];
+
+                templates.blocks[ i ] = templates.blocks[ i ].replace( matched[ j ], block );
+            }
+        }
+    }
 },
 
 

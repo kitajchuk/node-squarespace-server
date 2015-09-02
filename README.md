@@ -9,6 +9,8 @@ node-squarespace-server
 - [0.3.1 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
+- Support parsing block partials inside of other block partials
+- Support template lookup when regionKey seems invalid
 - Integrate better logging using [node-squarespace-logger](https://github.com/kitajchuk/node-squarespace-logger)
 - Support folder-navigation tag
 - Support static pages
