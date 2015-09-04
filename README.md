@@ -6,9 +6,10 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.3.1 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.3.2 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
+- [Support recursive section/repeated section context in JSONT](https://github.com/kitajchuk/node-squarespace-jsont/commit/1e1dc86d56e3e713e4d4c3c4af3fc59d6ba3cd55)
 - Support parsing block partials inside of other block partials
 - Support template lookup when regionKey seems invalid
 - Integrate better logging using [node-squarespace-logger](https://github.com/kitajchuk/node-squarespace-logger)
