@@ -6,7 +6,8 @@ var fs = require( "fs" ),
     path = require( "path" ),
     exec = require( "child_process" ).exec,
     util = require( "../squarespace-util" ),
-    server = require( "../squarespace-server" ), 
+    sqsLogger = require( "node-squarespace-logger" ),
+    server = require( "../squarespace-server" ),
     config = path.join( cwd, "template.conf" ),
     forever = path.join( __dirname, "../", "node_modules", "forever", "bin", "forever" ),
     startup = path.join( __dirname, "../squarespace-startup.js" )
@@ -22,7 +23,7 @@ if ( versionIdx !== -1 ) {
 // Warn and stop or print usage if no template.conf
 } else if ( !fs.existsSync( config )  ) {
     if ( args.length ) {
-        util.log( "Required template.conf not found" );
+        sqsLogger.log( "error", "Required template.conf not found" );
 
         process.exit();
 
@@ -32,7 +33,7 @@ if ( versionIdx !== -1 ) {
 
 // Start with forever process
 } else if ( foreverIdx !== -1 ) {
-    util.log( "Started server with forever" );
+    sqsLogger.log( "info", "Started server with forever" );
 
     // Splice --forever flag from the argument list
     args.splice( foreverIdx, 1 );
@@ -41,7 +42,7 @@ if ( versionIdx !== -1 ) {
 
 // Stop server started with forever process
 } else if ( forneverIdx !== -1 ) {
-    util.log( "Stopping server running forever daemon" );
+    sqsLogger.log( "info", "Stopping server running forever daemon" );
 
     // Splice --fornever flag from the argument list
     args.splice( forneverIdx, 1 );
