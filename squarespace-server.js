@@ -29,7 +29,6 @@ var bodyParser = require( "body-parser" ),
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
-    version = "0.3.2",
     loginHTML = "",
     fourOhFourHTML = "",
 
@@ -38,6 +37,7 @@ var bodyParser = require( "body-parser" ),
     sqsUtil = require( "./squarespace-util" ),
     sqsTemplate = require( "./squarespace-template" ),
     sqsCache = require( "./squarespace-cache" ),
+    package = sqsUtil.readJson( path.join( __dirname, "package.json" ) ),
 
 
 /**
@@ -452,8 +452,9 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
  *
  */
 printUsage = function () {
-    console.log( "Squarespace Server" );
-    console.log( "Version " + version );
+    console.log( package.title );
+    console.log( package.description );
+    console.log( "Version " + package.version );
     console.log();
     console.log( "Commands:" );
     console.log( "sqs buster       Delete local site cache" );
@@ -479,7 +480,7 @@ printUsage = function () {
  *
  */
 printVersion = function () {
-    sqsLogger.log( "info", ("Node Squarespace Server version " + version) );
+    sqsLogger.log( "info", (package.title + " version " + package.version) );
     process.exit();
 },
 
