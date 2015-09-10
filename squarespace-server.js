@@ -21,6 +21,7 @@ var bodyParser = require( "body-parser" ),
     rIco = /\.ico$/,
     rApi = /^\/api/,
     rUniversal = /^\/universal/,
+    rClickthroughUrl = /^\/s\//,
     sqsUser = null,
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
@@ -132,12 +133,12 @@ renderResponse = function ( appRequest, appResponse ) {
     var cacheHtml = null,
         cacheJson = null,
         cacheName = null,
-        slugged = slug( appRequest.params[ 0 ] ),
-        reqSlug = ( slugged === "" ) ? "homepage" : slugged,
+        slugged = slug( appRequest.params[ 0 ].replace( /\//g, "-" ).replace( /-$/g, "" ) ),
+        reqSlug = ( slugged === "" ) ? "-homepage" : slugged,
         url = appRequest.params[ 0 ],
         qrs = {};
 
-    cacheName = ("page-" + reqSlug);
+    cacheName = ("page" + reqSlug);
 
     // Querystring?
     for ( var i in appRequest.query ) {
@@ -317,8 +318,8 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
         return;
     }
 
-    // Favicon / Universal Image
-    if ( rIco.test( appRequest.params[ 0 ] ) || rUniversal.test( appRequest.params[ 0 ] ) ) {
+    // Favicon / Universal Image / clickthroughUrl
+    if ( rIco.test( appRequest.params[ 0 ] ) || rUniversal.test( appRequest.params[ 0 ] ) || rClickthroughUrl.test( appRequest.params[ 0 ] ) ) {
         appResponse.redirect( (serverConfig.siteurl + appRequest.params[ 0 ]) );
 
         return;

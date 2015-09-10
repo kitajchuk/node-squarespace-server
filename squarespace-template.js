@@ -35,7 +35,6 @@ var path = require( "path" ),
     rSQSFolderNavis = /<squarespace:folder-navigation(.*?)\/\>/g,
     rSQSBlockFields = /<squarespace:block-field(.*?)\/\>/g,
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
-    rSQSClickThroughUrl = /\/s\/(.*?)\.\w+.*?/g,
     rSQSFootersFull = /<script type="text\/javascript" data-sqs-type="imageloader-bootstraper"\>(.*?)(Squarespace\.afterBodyLoad\(Y\);)<\/script\>/,
     rSQSHeadersFull = /<\!-- This is Squarespace\. -->(.*?)<\!-- End of Squarespace Headers -->/,
     SQS_HEADERS = "{squarespace-headers}",
@@ -507,9 +506,6 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
     // Render Folder Navigations from pageJson
     rendered = replaceFolderNavigations( rendered, pageJson );
-
-    // Render full clickThroughUrl's
-    rendered = replaceClickThroughUrls( rendered );
 
     // Render page in full w/jsontemplate
     rendered = sqsJsonTemplate.render( rendered, pageJson );
@@ -1152,30 +1148,6 @@ getNavigationContextItems = function ( links, pageJson ) {
     }
 
     return items;
-},
-
-
-/**
- *
- * @method replaceClickThroughUrls
- * @param {string} rendered The template rendering
- * @returns {string}
- * @private
- *
- */
-replaceClickThroughUrls = function ( rendered ) {
-    var matched = rendered.match( rSQSClickThroughUrl ),
-        fullUrl;
-
-    if ( matched ) {
-        for ( i = 0, len = matched.length; i < len; i++ ) {
-            fullUrl = (config.server.siteurl + matched[ i ]);
-
-            rendered = rendered.replace( matched[ i ], fullUrl );
-        }
-    }
-
-    return rendered;
 },
 
 
