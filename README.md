@@ -100,7 +100,8 @@ These are the most common causes for issues running the server and how to resolv
 
 - Make sure you use the `https` protocol for your siteurl.
 - Make sure you use the `"sandbox": true` setting in your template.conf if using an account in trial mode.
-- Bust your local cache and rerun the server if getting the error `TypeError: Cannot read property 'typeName' of undefined`. This is usually a result of running the server on a trial mode account without the `"sandbox": true` setting. The app caches "undefined" locally as it cannot access your site. Adding the setting to template.conf fixes the issue, but you still need to clear your local cache to get going again. Use `sqs buster` to achieve this.
+- When in doubt, bust your local cache with `sqs buster` and try again.
+- If all else fails, [open an issue](https://github.com/kitajchuk/node-squarespace-server/issues/new) and lets get to the bottom of it.
 
 
 
