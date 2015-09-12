@@ -851,7 +851,7 @@ replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
         bodyElem = pageHtml.match( rBodyTag ),
         bodyAttr = sqsUtil.getAttrObj( bodyElem[ 0 ] );
 
-    rendered = rendered.replace( SQS_MAIN_CONTENT, pageJson.mainContent );
+    rendered = rendered.replace( SQS_MAIN_CONTENT, (pageJson.mainContent || "") );
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
     rendered = rendered.replace( SQS_PAGE_CLASSES, bodyAttr.class );
     rendered = rendered.replace( SQS_PAGE_ID, (pageType + "-" + pageId) );
