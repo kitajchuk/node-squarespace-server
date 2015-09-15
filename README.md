@@ -6,10 +6,11 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.3.4 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.3.6 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
-- Better cache naming
+- Provide a sandbox dev hook in JSONT, `nodeServer`
+- Better naming convention for local .sqs-cache
 - Catch and handle redirect for clickthroughUrl's
 - [Support recursive section/repeated section context in JSONT](https://github.com/kitajchuk/node-squarespace-jsont/commit/1e1dc86d56e3e713e4d4c3c4af3fc59d6ba3cd55)
 - Support parsing block partials inside of other block partials
@@ -113,12 +114,12 @@ This uses the [node-squarespace-middleware](https://github.com/kitajchuk/node-sq
 
 
 ### Workflow
-You can use any front-end workflow you like when working with a custom Squarespace template. At the very least the separation of your source files and your actual template is recommended. I have developed a [grunt](http://gruntjs.com) workflow that bootstraps a [grunt-nautilus](https://github.com/kitajchuk/grunt-nautilus) based approach: [grunt-init-squarespace](https://github.com/kitajchuk/grunt-init-squarespace). At the very least, this is a good example of how to go about setting up your own workflow which keeps your source and template code separate. I have been working on [grunt-nautilus-squarespace-boilerplate](https://github.com/kitajchuk/grunt-nautilus-squarespace-boilerplate) as a better starting place, try it out if it fits your style.
+You can use any front-end workflow you like when working with a custom Squarespace template. At the very least the separation of your source files and your actual template is recommended. I have developed a [grunt](http://gruntjs.com) workflow that bootstraps a [grunt-nautilus](https://github.com/kitajchuk/grunt-nautilus) based approach: [grunt-init-squarespace](https://github.com/kitajchuk/grunt-init-squarespace). This boilerplate, [grunt-nautilus-squarespace-boilerplate](https://github.com/kitajchuk/grunt-nautilus-squarespace-boilerplate), is a better starting place if this fits your style. And if you're not a fan of [Grunt](http://gruntjs.com/), the [templar](https://github.com/kitajchuk/templar) boilerplate project is one that aims to reduce the dependency footprint as well as provide a better suite of tools including [Webpack](https://webpack.github.io/), [ESLint](http://eslint.org/) and [Babel](http://babeljs.io/).
 
 
 
 ### Login
-You will first be prompted with a login page. Enter your email and password for YOUR Squarespace account ( used for logging into `/config` ) that is associated with THIS Squarespace site. This information is not stored anywhere, it is just used to make some initial requests to retrieve data for your site.
+You will first be prompted with a login page. Enter your email and password for __YOUR__ Squarespace account ( used for logging into `/config` ) that is associated with __THIS__ Squarespace site. This information is not stored anywhere, it is just used to make some initial requests to retrieve data for your site.
 
 
 

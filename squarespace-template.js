@@ -445,6 +445,9 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         len,
         i;
 
+    // Unique page JSON property for sandbox dev mode
+    pageJson.nodeServer = true;
+
     // Create {squarespace-headers} / {squarespace-footers}
     setHeaderFooterTokens( pageJson, pageHtml );
 
@@ -454,7 +457,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         regionKey = ((pageJson.collection.regionName || "default") + ".region");
 
         // Possibly the regionName isn't really what we want ?
-        // It would seem that when using galleries, the regionKey is no what we're looking for.
+        // It would seem that when using galleries, the regionKey is not what we're looking for.
         // In this case, just assume the collection template and we don't have to replace mainContent.
         if ( !templates.regions[ regionKey ] ) {
             rendered += templates.collections[ templateKey ];
