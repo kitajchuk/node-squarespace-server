@@ -584,6 +584,8 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
         // Cached?
         if ( cache && qrs.nocache === undefined ) {
+            cache.nodeServer = true;
+
             tpl = sqsJsonTemplate.render( query.template, cache );
 
             rendered = rendered.replace( query.queryProcessed, tpl );
@@ -594,6 +596,8 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             sqsMiddleware.getQuery( query.queryData, qrs, function ( error, json ) {
                 if ( !error ) {
                     sqsCache.set( key, json );
+
+                    json.nodeServer = true;
 
                     tpl = sqsJsonTemplate.render( query.template, json );
 
@@ -976,7 +980,8 @@ replaceNavigations = function ( rendered, pageJson ) {
             active: false,
             folderActive: false,
             website: pageJson.website,
-            items: []
+            items: [],
+            nodeServer: true
         },
         block,
         attrs,
@@ -1029,7 +1034,8 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
             active: false,
             folderActive: false,
             website: pageJson.website,
-            items: []
+            items: [],
+            nodeServer: true
         },
         block,
         attrs,

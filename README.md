@@ -6,7 +6,7 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.3.6 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.3.7 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
 - Provide a sandbox dev hook in JSONT, `nodeServer`

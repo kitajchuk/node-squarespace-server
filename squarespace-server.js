@@ -196,11 +196,15 @@ renderResponse = function ( appRequest, appResponse ) {
     // JSON?
     if ( appRequest.query.format === "json" ) {
         if ( cacheJson ) {
+            cacheJson.nodeServer = true;
+
             appResponse.status( 200 ).json( cacheJson );
 
         } else {
             sqsMiddleware.getJson( url, qrs, function ( error, json ) {
                 if ( !error ) {
+                    json.json.nodeServer = true;
+
                     sqsCache.set( (cacheName + ".json"), json.json );
 
                     appResponse.status( 200 ).json( json.json );
