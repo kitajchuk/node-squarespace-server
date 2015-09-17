@@ -33,7 +33,7 @@ if ( versionIdx !== -1 ) {
 
 // Start with forever process
 } else if ( foreverIdx !== -1 ) {
-    sqsLogger.log( "info", "Started server with forever" );
+    sqsLogger.log( "server", "Started server with forever" );
 
     // Splice --forever flag from the argument list
     args.splice( foreverIdx, 1 );
@@ -42,7 +42,7 @@ if ( versionIdx !== -1 ) {
 
 // Stop server started with forever process
 } else if ( forneverIdx !== -1 ) {
-    sqsLogger.log( "info", "Stopping server running forever daemon" );
+    sqsLogger.log( "server", "Stopping the forever server" );
 
     // Splice --fornever flag from the argument list
     args.splice( forneverIdx, 1 );
