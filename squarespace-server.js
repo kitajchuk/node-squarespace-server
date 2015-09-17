@@ -525,14 +525,14 @@ processArguments = function ( args, cb ) {
 
     // Silence is golden
     if ( flags.quiet ) {
-        sqsLogger.log( "server", "Squarespace server running in the dark" );
+        sqsLogger.log( "server", "Squarespace server running in silent mode" );
         sqsLogger.silence();
     }
 
     // Livereload
     if ( flags.reload ) {
         serverConfig.reload = true;
-        sqsLogger.log( "server", "Squarespace server running livereload" );
+        sqsLogger.log( "server", "Squarespace server running in livereload mode" );
     }
 
     // Order of operations
@@ -599,7 +599,7 @@ startServer = function () {
     });
 
     // Log that the server is running
-    sqsLogger.log( "server", ("Squarespace server running on port => " + serverConfig.port) );
+    sqsLogger.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
 };
 
 
