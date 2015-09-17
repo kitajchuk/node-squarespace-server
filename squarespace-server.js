@@ -16,6 +16,9 @@ var bodyParser = require( "body-parser" ),
     fs = require( "fs" ),
     slug = require( "slug" ),
 
+    browserSync = require( "browser-sync" ),
+    browserSyncPort = 3000,
+
     rProtocol = /^https:|^http:/g,
     rSlash = /^\/|\/$/g,
     rIco = /\.ico$/,
@@ -471,6 +474,7 @@ printUsage = function () {
     console.log( "sqs --fornever   Stop server started with forever" );
     console.log( "sqs --port=XXXX  Use the specified port" );
     console.log( "sqs --quiet      Silence the logger" );
+    console.log( "sqs --reload     Reload the webpage when template changes" );
     console.log();
     console.log( "Examples:" );
     console.log( "sqs server --port=8000" );
@@ -521,8 +525,14 @@ processArguments = function ( args, cb ) {
 
     // Silence is golden
     if ( flags.quiet ) {
-        sqsLogger.log( "server", "Squarespace server running in the dark" );
+        sqsLogger.log( "server", "Squarespace server running in silent mode" );
         sqsLogger.silence();
+    }
+
+    // Livereload
+    if ( flags.reload ) {
+        serverConfig.reload = true;
+        sqsLogger.log( "server", "Squarespace server running in livereload mode" );
     }
 
     // Order of operations
@@ -535,10 +545,31 @@ processArguments = function ( args, cb ) {
 
     } else if ( commands.server ) {
         if ( flags.port ) {
-            serverConfig.port = flags.port;
+            flags.port = Number( flags.port );
+
+            if ( flags.port === browserSyncPort ) {
+                sqsLogger.log( "error", ("You cannot use the same port as browser-sync: " + browserSyncPort) );
+                process.exit();
+
+            } else {
+                serverConfig.port = flags.port;
+            }
         }
 
         cb();
+    }
+},
+
+
+/**
+ *
+ * @method reloadServer
+ * @private
+ *
+ */
+reloadServer = function () {
+    if ( serverConfig.reload ) {
+        browserSync.reload();
     }
 },
 
@@ -554,13 +585,21 @@ startServer = function () {
     expressApp.use( express.static( serverConfig.webroot ) );
     expressApp.use( bodyParser.json() );
     expressApp.use( bodyParser.urlencoded( {extended: true} ) );
-    expressApp.set( "port", serverConfig.port );
+    expressApp.set( "port", browserSyncPort );
     expressApp.get( "*", onExpressRouterGET );
     expressApp.post( "/", onExpressRouterPOST );
-    expressApp.listen( expressApp.get( "port" ) );
+    expressApp.listen( browserSyncPort );
+
+    browserSync.init( null, {
+        open: true,
+        port: serverConfig.port,
+        proxy: ("localhost:" + browserSyncPort),
+        notify: false,
+        logLevel: "silent"
+    });
 
     // Log that the server is running
-    sqsLogger.log( "server", ("Squarespace server running on port => " + expressApp.get( "port" )) );
+    sqsLogger.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
 };
 
 
@@ -609,7 +648,9 @@ module.exports = {
                 sqsTemplate.preload();
                 sqsTemplate.compile(function () {
                     // Watch for template changes
-                    sqsTemplate.watch();
+                    sqsTemplate.watch(function () {
+                        reloadServer();
+                    });
 
                     startServer();
                 });
@@ -617,10 +658,12 @@ module.exports = {
 
             // Watch for changes to template.conf and reload it
             fs.watchFile( templateConfigPath, function () {
+                sqsLogger.log( "template", "Reloaded template.conf json" );
+
                 sqsUtil.readJson( templateConfigPath, function ( data ) {
                     setTemplateConfig( data );
 
-                    sqsLogger.log( "template", "Reloaded template.conf json" );
+                    reloadServer();
                 });
             });
         });

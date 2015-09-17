@@ -6,9 +6,10 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.3.7 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.4.0 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
+- Implement livereload with [browser-sync](https://github.com/BrowserSync/browser-sync)
 - Provide a sandbox dev hook in JSONT, `nodeServer`
 - Better naming convention for local .sqs-cache
 - Catch and handle redirect for clickthroughUrl's
@@ -79,11 +80,14 @@ sqs --version
 # Run the server
 sqs server
 
+# Run the server with livereload
+sqs server --reload
+
 # Run the server with forever
 sqs server --forever
 
 # Stop server started with forever
-sqs --fornever
+sqs server --fornever
 
 # Run the server on a specific port
 sqs server --port=8000

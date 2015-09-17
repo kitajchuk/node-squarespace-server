@@ -133,11 +133,13 @@ compile = function ( cb ) {
  * @public
  *
  */
-watch = function () {
+watch = function ( cb ) {
     function doneWatch( filename ) {
         sqsLogger.log( "template", "Reloaded local template" );
 
         replaceAll();
+
+        cb();
 
         setTimeout( function () {
             delete updating[ filename ];
