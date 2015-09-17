@@ -34,7 +34,6 @@ var bodyParser = require( "body-parser" ),
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
     loginHTML = "",
-    fourOhFourHTML = "",
 
     sqsLogger = require( "node-squarespace-logger" ),
     sqsMiddleware = require( "node-squarespace-middleware" ),
@@ -223,14 +222,6 @@ renderResponse = function ( appRequest, appResponse ) {
     } else {
         sqsMiddleware.getJsonAndHtml( url, qrs, function ( error, data ) {
             if ( !error ) {
-                if ( data.html.status === 404 || data.json.status === 404 ) {
-                    appResponse.status( 200 ).send( fourOhFourHTML );
-
-                    sqsLogger.log( "warn", ("Request responded with server code 404 for => `" + url + "`") );
-
-                    return;
-                }
-
                 sqsCache.set( (cacheName + ".json"), data.json.json );
                 sqsCache.set( (cacheName + ".html"), data.html.html );
 
@@ -241,6 +232,15 @@ renderResponse = function ( appRequest, appResponse ) {
             } else {
                 // Handle errors
                 sqsLogger.log( "error", ("Error requesting page => " + error) );
+
+                // Could be a 404 though so serve it
+                if ( data.html.status === 404 || data.json.status === 404 ) {
+                    appResponse.status( 200 ).send( data.html.html );
+
+                    sqsLogger.log( "warn", ("Request responded with server code 404 for => `" + url + "`") );
+
+                    return;
+                }
             }
         });
     }
@@ -635,11 +635,6 @@ module.exports = {
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
                 loginHTML = sqsUtil.packStr( data );
-            });
-
-            // Prefetch the 404 page HTML
-            sqsUtil.readFile( path.join( __dirname, "tpl/404.html" ), function ( data ) {
-                fourOhFourHTML = sqsUtil.packStr( data );
             });
 
             // Preload the sqs-cache
