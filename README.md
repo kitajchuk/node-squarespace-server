@@ -6,9 +6,18 @@ node-squarespace-server
 
 ### Release
 ***Using the latest is always recommended.***
-- [0.4.0 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+- [0.4.1 - Stable](https://www.npmjs.com/package/node-squarespace-server).
 
 #### Recent Updates
+- Support more formatters:
+ - `comment-count`
+ - `comment-link`
+ - `like-button`
+ - `social-button`
+ - `social-button-inline`
+ - `product-status`
+ - `product-price`
+ - `product-checkout`
 - Implement livereload with [browser-sync](https://github.com/BrowserSync/browser-sync)
 - Provide a sandbox dev hook in JSONT, `nodeServer`
 - Better naming convention for local .sqs-cache
