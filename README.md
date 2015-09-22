@@ -5,11 +5,16 @@ node-squarespace-server
 
 
 ### Release
-***Using the latest is always recommended.***
-- [0.4.1 - Stable](https://www.npmjs.com/package/node-squarespace-server).
+***Using the latest package versions is always recommended.***
+- [node-squarespace-server@0.4.1](https://www.npmjs.com/package/node-squarespace-server)
+ - [node-squarespace-jsont@0.1.16](https://www.npmjs.com/package/node-squarespace-jsont)
+ - [node-squarespace-logger@0.1.1](https://www.npmjs.com/package/node-squarespace-logger)
+ - [node-squarespace-middleware@0.2.1](https://www.npmjs.com/package/node-squarespace-middleware)
+ 
 
 #### Recent Updates
 - Support more formatters:
+ - `smartypants`
  - `pluralize` 
  - `comment-count`
  - `comment-link`
@@ -78,7 +83,7 @@ And you will want to add this to your `.gitignore`:
 .sqs-cache
 ```
 
-Once you have that, a simple:
+#### API
 
 ```shell
 # View api
@@ -119,11 +124,6 @@ These are the most common causes for issues running the server and how to resolv
 - Make sure you use the `"sandbox": true` setting in your template.conf if using an account in trial mode.
 - When in doubt, bust your local cache with `sqs buster` and try again.
 - If all else fails, [open an issue](https://github.com/kitajchuk/node-squarespace-server/issues/new) and lets get to the bottom of it.
-
-
-
-### Middleware
-This uses the [node-squarespace-middleware](https://github.com/kitajchuk/node-squarespace-middleware) to interface with your Squarespace site.
 
 
 
