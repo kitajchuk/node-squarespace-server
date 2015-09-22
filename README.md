@@ -11,12 +11,17 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
 ### Release
 ***Using the latest package versions is always recommended.***
 - [node-squarespace-server@0.4.1](https://www.npmjs.com/package/node-squarespace-server)
- - [node-squarespace-jsont@0.1.16](https://www.npmjs.com/package/node-squarespace-jsont)
+ - [node-squarespace-jsont@0.1.17](https://www.npmjs.com/package/node-squarespace-jsont)
  - [node-squarespace-logger@0.1.1](https://www.npmjs.com/package/node-squarespace-logger)
  - [node-squarespace-middleware@0.2.1](https://www.npmjs.com/package/node-squarespace-middleware)
  
 
 #### Recent Updates
+- Support more predicates:
+ - `comments?`
+ - `folder?`
+ - `location?`
+ - `video?`
 - Support more formatters:
  - `smartypants`
  - `pluralize` 
