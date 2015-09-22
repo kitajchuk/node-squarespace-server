@@ -10,6 +10,7 @@ node-squarespace-server
 
 #### Recent Updates
 - Support more formatters:
+ - `pluralize` 
  - `comment-count`
  - `comment-link`
  - `like-button`
