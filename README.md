@@ -1,7 +1,11 @@
 node-squarespace-server
 =======================
 
-> A local Squarespace development server in [node.js](http://nodejs.org/) for folks using the [developer platform](http://developers.squarespace.com).
+> A local Squarespace development server in [node.js](http://nodejs.org/).
+
+
+### About
+This tool lets [Squarespace Developers](http://developers.squarespace.com) build their templates locally by running a node.js proxy server to interface with a Squarespace site. It watches your template and recompiles when changes are made. It's ever a WIP, but a step in the right direction for open-source Squarespace development.
 
 
 ### Release
