@@ -983,6 +983,7 @@ replaceNavigations = function ( rendered, pageJson ) {
             folderActive: false,
             website: pageJson.website,
             items: [],
+            extras: {},
             nodeServer: true
         },
         block,
@@ -1037,6 +1038,7 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
             folderActive: false,
             website: pageJson.website,
             items: [],
+            extras: {},
             nodeServer: true
         },
         block,
@@ -1078,14 +1080,18 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
                     link = links[ k ];
 
                     if ( rIndexFolder.test( link.typeName ) ) {
-                        for ( l = links[ k ].children.length; l--; ) {
-                            child = links[ k ].children[ l ];
+                        // Indexes and Folders can potentially NOT have children
+                        // https://github.com/NodeSquarespace/node-squarespace-server/issues/130
+                        if ( link.children ) {
+                            for ( l = link.children.length; l--; ) {
+                                child = link.children[ l ];
 
-                            if ( child.collectionId === pageJson.collection.id ) {
-                                context.items = getNavigationContextItems(
-                                    links[ k ].children,
-                                    pageJson
-                                );
+                                if ( child.collectionId === pageJson.collection.id ) {
+                                    context.items = getNavigationContextItems(
+                                        link.children,
+                                        pageJson
+                                    );
+                                }
                             }
                         }
                     }
