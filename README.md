@@ -18,6 +18,8 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
 
 #### Recent Updates
 - Support more predicates:
+ - `image?`
+ - `passthrough?`
  - `comments?`
  - `folder?`
  - `location?`
