@@ -6,7 +6,6 @@
 var path = require( "path" ),
     fs = require( "fs" ),
     less = require( "less" ),
-    uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
 
     rIndexFolder = /index|folder/g,
@@ -818,23 +817,19 @@ compileStylesheets = function ( cb ) {
 
                 } else {
                     sqsUtil.readFile( style.path, function ( data ) {
-                        if ( rLess.test( style.name ) ) {
-                            less.render( data, function ( error, css ) {
-                                if ( error === null ) {
-                                    siteCss += css;
+                        // Process through less compiler no matter what
+                        // This will account for Sass -> Less interpolation issues
+                        // Like this note, https://github.com/kitajchuk/templar#sass-vs-less
+                        less.render( data, function ( error, css ) {
+                            if ( error === null ) {
+                                siteCss += css;
 
-                                } else {
-                                    sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
-                                }
-
-                                read();
-                            });
-
-                        } else {
-                            siteCss += uglifycss.processString( data );
+                            } else {
+                                sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
+                            }
 
                             read();
-                        }
+                        });
                     });
                 }
             });
