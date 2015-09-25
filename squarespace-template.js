@@ -5,8 +5,10 @@
  */
 var path = require( "path" ),
     fs = require( "fs" ),
-    less = require( "less" ),
+    uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
+    exec = require( "child_process" ).exec,
+    rimraf = require( "rimraf" ),
 
     rIndexFolder = /index|folder/g,
     rMetaLeft = /\{\.meta-left\}/g,
@@ -795,10 +797,14 @@ compilePages = function ( cb ) {
 compileStylesheets = function ( cb ) {
     siteCss = "";
 
-    var styles = [{
-        name: "reset.css",
-        path: path.join( directories.styles, "reset.css" )
-    }];
+    var tmpDir = path.join( directories.styles, ".tmp" ),
+        tmpFile = path.join( tmpDir, "site.less" ),
+        outFile = path.join( tmpDir, "site.css" ),
+        lessC = path.join( __dirname, "bin", "lessc" ),
+        styles = [{
+            name: "reset.css",
+            path: path.join( directories.styles, "reset.css" )
+        }];
 
     for ( var i = 0, len = config.template.stylesheets.length; i < len; i++ ) {
         styles.push({
@@ -807,12 +813,26 @@ compileStylesheets = function ( cb ) {
         });
     }
 
+    // Make sure we clear out the `.tmp` dir
+    rimraf.sync( tmpDir );
+
+    // Remake the `.tmp` dir
+    sqsUtil.makeDir( tmpDir );
+
     function read() {
         if ( !styles.length ) {
-            cb();
+            sqsUtil.writeFile( tmpFile, siteCss );
+
+            exec( (lessC + " --compress " + tmpFile + " " + outFile), function ( error, stdout, stderr ) {
+                //siteCss = sqsUtil.readFile( outFile );
+                //rimraf.sync( tmpDir );
+                console.log( arguments );
+                //console.log( siteCss );
+                //cb();
+            });
 
         } else {
-            var style = styles.pop();
+            var style = styles.shift();
 
             sqsUtil.isFile( style.path, function ( exists ) {
                 if ( !exists ) {
@@ -820,19 +840,9 @@ compileStylesheets = function ( cb ) {
 
                 } else {
                     sqsUtil.readFile( style.path, function ( data ) {
-                        // Process through less compiler no matter what
-                        // This will account for Sass -> Less interpolation issues
-                        // Like this note, https://github.com/kitajchuk/templar#sass-vs-less
-                        less.render( data, function ( error, css ) {
-                            if ( error === null ) {
-                                siteCss += css;
+                        siteCss += data;
 
-                            } else {
-                                sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
-                            }
-
-                            read();
-                        });
+                        read();
                     });
                 }
             });

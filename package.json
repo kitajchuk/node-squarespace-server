@@ -39,14 +39,15 @@
     "express": "~4.9",
     "forever": "~0.11",
     "fs-extra": "~0.12",
-    "less": "~1.7",
     "mustache": "~0.8",
     "node-squarespace-jsont": "~0.1.5",
     "node-squarespace-logger": "~0.1",
     "node-squarespace-middleware": "~0.2",
     "phpjs": "~1.3",
     "request": "~2",
-    "slug": "~0.7"
+    "rimraf": "^2.4.3",
+    "slug": "~0.7",
+    "uglifycss": "0.0.9"
   },
   "keywords": [
     "squarespace",

@@ -14,4 +14,5 @@ npm-debug.log
 /node_modules
 /test
 /template-compiler
+/less-compiler
 /local
