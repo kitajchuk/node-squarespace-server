@@ -472,6 +472,9 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     } else if ( rPage.test( templateKey ) ) {
         regionKey = ((pageJson.collection.regionName || "default") + ".region");
 
+        // In case there was a regionName but no `layout` to match in `template.conf`
+        regionKey = templates.regions[ regionKey ] ? regionKey : "default.region";
+
         // This wraps the matched page template with the default or set region
         rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.pages[ templateKey ] );
 
@@ -872,14 +875,13 @@ replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
  *
  */
 getTemplateKey = function ( pageJson ) {
-    var template = null,
-        regcheck = null,
+    var template = "",
         typeName = null,
         regionName = null;
 
     // This could happen, I suppose...
     if ( !pageJson ) {
-        return;
+        return template;
     }
 
     // Grab the collection typeName
