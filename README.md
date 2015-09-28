@@ -48,6 +48,16 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
 - Support system search page
 
 
+### Prerequisites
+Squarespace LESS compiler [https://github.com/Squarespace/less-compiler]
+
+```shell
+git clone https://github.com/Squarespace/less-compiler.git
+cd squarespace-less
+gradle makeCli
+mv ./lessc /usr/local/bin/sqs-lessc
+sqs-lessc -h
+```
 ### Installation
 ```shell
 npm install -g node-squarespace-server
