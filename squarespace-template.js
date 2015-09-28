@@ -5,8 +5,10 @@
  */
 var path = require( "path" ),
     fs = require( "fs" ),
-    less = require( "less" ),
+    uglifycss = require( "uglifycss" ),
     mustache = require( "mustache" ),
+    sys = require('sys'),
+    execFile = require('child_process').execFile,
 
     rIndexFolder = /index|folder/g,
     rMetaLeft = /\{\.meta-left\}/g,
@@ -795,51 +797,34 @@ compilePages = function ( cb ) {
 compileStylesheets = function ( cb ) {
     siteCss = "";
 
-    var styles = [{
-        name: "reset.css",
-        path: path.join( directories.styles, "reset.css" )
-    }];
-
+    styles = [
+        '@import "reset.css";'
+    ];
+    
     for ( var i = 0, len = config.template.stylesheets.length; i < len; i++ ) {
-        styles.push({
-            name: config.template.stylesheets[ i ],
-            path: path.join( directories.styles, config.template.stylesheets[ i ] )
-        });
+        styles.push(
+            '@import "' + config.template.stylesheets[ i ] + '";'
+        );
     }
 
-    function read() {
-        if ( !styles.length ) {
-            cb();
-
-        } else {
-            var style = styles.pop();
-
-            sqsUtil.isFile( style.path, function ( exists ) {
-                if ( !exists ) {
-                    read();
-
-                } else {
-                    sqsUtil.readFile( style.path, function ( data ) {
-                        // Process through less compiler no matter what
-                        // This will account for Sass -> Less interpolation issues
-                        // Like this note, https://github.com/kitajchuk/templar#sass-vs-less
-                        less.render( data, function ( error, css ) {
-                            if ( error === null ) {
-                                siteCss += css;
-
-                            } else {
-                                sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
-                            }
-
-                            read();
-                        });
-                    });
-                }
-            });
+    fs.writeFile( path.join(directories.styles, 'style.less') , styles.join("\n") , function(err) {
+        if(err) {
+            return sqsLogger.log( "error", err);
         }
-    }
 
-    read();
+        execFile(
+            "/usr/local/bin/sqs-lessc",
+            ['style.less', 'style.css'],
+            {cwd: directories.styles},
+            function(error, stdout, stderr) {
+                if ( error === null ) {
+                    sqsLogger.log( "info", ("style.less compiled successfully") );
+                } else {
+                    sqsLogger.log( "warn", ("Issue compiling styles => " + stderr) );
+                }
+            }
+        );
+    });
 },
 
 
