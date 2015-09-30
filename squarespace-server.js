@@ -307,7 +307,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Site CSS
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
-        appResponse.set( "Content-Type", "text/css" ).status( 200 ).send( sqsTemplate.getSiteCss() );
+        appResponse.set( "Content-Type", "text/css" ).status( 200 ).send( sqsTemplate.getSiteCss( appRequest.query.isStaticLocal ) );
 
         return;
     }

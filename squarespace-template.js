@@ -36,6 +36,7 @@ var path = require( "path" ),
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
     rSQSFootersFull = /<script type="text\/javascript" data-sqs-type="imageloader-bootstraper"\>(.*?)(Squarespace\.afterBodyLoad\(Y\);)<\/script\>/,
     rSQSHeadersFull = /<\!-- This is Squarespace\. -->(.*?)<\!-- End of Squarespace Headers -->/,
+    rSQSSiteCssLink = /<\!--\[if \!IE\]> -->(.*?)<\!-- <\!\[endif\]-->/,
     SQS_HEADERS = "{squarespace-headers}",
     SQS_FOOTERS = "{squarespace-footers}",
     SQS_MAIN_CONTENT = "{squarespace.main-content}",
@@ -48,7 +49,6 @@ var path = require( "path" ),
     directories = {},
     config = {},
     scripts = [],
-    siteCss = "",
     templates = {
         regions: {},
         collections: {},
@@ -57,6 +57,10 @@ var path = require( "path" ),
     },
     layoutHTML = "",
     updating = {},
+    stylesheets = {
+        remoteSiteCss: null,
+        localSiteCss: null
+    },
 
     // Default to unique logger incase setLogger isn't called
     sqsLogger = require( "node-squarespace-logger" ),
@@ -81,6 +85,13 @@ var path = require( "path" ),
 preload = function () {
     sqsUtil.readFile( path.join( __dirname, "tpl/layout.html" ), function ( data ) {
         layoutHTML = sqsUtil.packStr( data );
+    });
+
+    // Implement an ignored local-hack for now as a minor resolve
+    // The contents of this CSS file are the Squarespace system CSS ONLY!
+    // As in, I literally copied and pasted that trash as a personal workaround for now :-/
+    sqsUtil.readFile( path.join( __dirname, "local/sqs-static-site.css" ), function ( data ) {
+        stylesheets.remoteSiteCss = sqsUtil.packStr( data );
     });
 },
 
@@ -250,12 +261,18 @@ setUser = function ( user ) {
 /**
  *
  * @method getSiteCss
+ * @param {boolean} isStaticLocal Optional flag to retrieve the local copy of remote static sitecss
  * @returns {string} compiled css
  * @public
  *
  */
-getSiteCss = function () {
-    return siteCss;
+getSiteCss = function ( isStaticLocal ) {
+    if ( isStaticLocal ) {
+        return stylesheets.remoteSiteCss;
+
+    } else {
+        return stylesheets.localSiteCss;
+    }
 },
 
 
@@ -793,7 +810,7 @@ compilePages = function ( cb ) {
  *
  */
 compileStylesheets = function ( cb ) {
-    siteCss = "";
+    stylesheets.localSiteCss = "";
 
     var styles = [{
         name: "reset.css",
@@ -825,7 +842,7 @@ compileStylesheets = function ( cb ) {
                         // Like this note, https://github.com/kitajchuk/templar#sass-vs-less
                         less.render( data, function ( error, css ) {
                             if ( error === null ) {
-                                siteCss += css;
+                                stylesheets.localSiteCss += css;
 
                             } else {
                                 sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
@@ -933,6 +950,11 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
     // Headers?
     if ( sHeadersFull ) {
         sHeadersFull = sHeadersFull[ 0 ];
+
+        if ( stylesheets.remoteSiteCss ) {
+            // Replace the remote <link /> to remote site.css
+            sHeadersFull = sHeadersFull.replace( rSQSSiteCssLink, '<link href="/site.css?isStaticLocal=true" rel="stylesheet" />' );
+        }
 
         // Override isWrappedForDamask to ensure public site loads
         if ( config.server.sandbox ) {
