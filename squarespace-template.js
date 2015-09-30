@@ -38,8 +38,10 @@ var path = require( "path" ),
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
     rSQSFootersFull = /<script type="text\/javascript" data-sqs-type="imageloader-bootstraper"\>(.*?)(Squarespace\.afterBodyLoad\(Y\);)<\/script\>/,
     rSQSHeadersFull = /<\!-- This is Squarespace\. -->(.*?)<\!-- End of Squarespace Headers -->/,
-    rSQSSiteCssLink = /<\!--[if \!IE]> -->(.*?)<!-- <\![endif]-->/,
+    rSQSSiteCssLink = /<\!--\[if \!IE\]> -->(.*?)<\!-- <\!\[endif\]-->/,
     rNodeCommentHook = /\/\* node-squarespace-server-rawLess-hook \*\/(.*?)/,
+    rSQSAtImports = /@import (.*?);/g,
+    rSQSCDNHolders = /\%SQUARESPACE_CDN\%/g,
 
     SQS_HEADERS = "{squarespace-headers}",
     SQS_FOOTERS = "{squarespace-footers}",
@@ -92,6 +94,7 @@ processTweaks = function () {
     var tweakData = config.server.siteData.templateTweakSettings,
         rawLessSplits = tweakData.rawLess.split( rNodeCommentHook ),
         rawLessSystem = rawLessSplits[ 0 ],
+        rawTweakLessSystem = tweakData.tweakLess,
         rawLessVars = "",
         tweakName,
         sep,
@@ -116,7 +119,8 @@ processTweaks = function () {
     }
 
     stylesheets.siteless.push( rawLessVars );
-    stylesheets.siteless.push( rawLessSystem );
+    stylesheets.siteless.push( rawLessSystem.replace( rSQSCDNHolders, "" ) );
+    stylesheets.siteless.push( rawTweakLessSystem.replace( rSQSCDNHolders, "" ) );
 },
 
 
@@ -841,6 +845,7 @@ compilePages = function ( cb ) {
  */
 compileStylesheets = function ( cb ) {
     stylesheets.sitecss = [];
+    stylesheets.localcss = "";
 
     var tmpDir = path.join( directories.styles, ".tmp" ),
         tmpFile = path.join( tmpDir, "site.less" ),
@@ -858,6 +863,11 @@ compileStylesheets = function ( cb ) {
         });
     }
 
+
+    // /universal/images-v6/*
+    // %SQUARESPACE_CDN%
+
+
     // Make sure we clear out the `.tmp` dir
     rimraf.sync( tmpDir );
 
@@ -869,9 +879,16 @@ compileStylesheets = function ( cb ) {
             sqsUtil.writeFile( tmpFile, (stylesheets.siteless.join( "\n" ) + stylesheets.sitecss.join( "\n" )) );
 
             exec( (lessC + " --compress " + tmpFile + " " + outFile), function ( error, stdout, stderr ) {
-                //rimraf.sync( tmpDir );
-                console.log( arguments );
-                //cb();
+                if ( !error ) {
+                    stylesheets.localcss = sqsUtil.readFile( outFile );
+
+                    rimraf.sync( tmpDir );
+
+                    cb();
+
+                } else {
+                    sqsLogger.log( "error", ("There was an error compiling stylesheets => " + error) );
+                }
             });
 
         } else {
@@ -883,6 +900,8 @@ compileStylesheets = function ( cb ) {
 
                 } else {
                     sqsUtil.readFile( style.path, function ( data ) {
+                        data = data.replace( rSQSAtImports, "/* @import replacement */" );
+
                         stylesheets.sitecss.push( data );
 
                         read();

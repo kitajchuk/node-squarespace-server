@@ -430,6 +430,12 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
                     // Pre-process the API tweak data
                     sqsTemplate.processTweaks();
+                    sqsTemplate.compile(function () {
+                        // Watch for template changes
+                        sqsTemplate.watch(function () {
+                            reloadServer();
+                        });
+                    });
 
                     // Store time of login
                     sqsTimeOfLogin = Date.now();
@@ -642,16 +648,11 @@ module.exports = {
 
             // Preload the sqs-cache
             sqsCache.preload(function () {
-                // Preload and process the template
+                // Preload the layout-engine mustache template
                 sqsTemplate.preload();
-                //sqsTemplate.compile(function () {
-                    // Watch for template changes
-                    sqsTemplate.watch(function () {
-                        reloadServer();
-                    });
 
-                    startServer();
-                //});
+                // Start the Express server proxied through browser-sync
+                startServer();
             });
 
             // Watch for changes to template.conf and reload it
