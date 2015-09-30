@@ -25,6 +25,7 @@ var bodyParser = require( "body-parser" ),
     rApi = /^\/api/,
     rUniversal = /^\/universal/,
     rClickthroughUrl = /^\/s\//,
+    rCssMap = /\.css\.map$/,
     sqsUser = null,
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
@@ -307,6 +308,13 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     // Site CSS
     if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "site.css" ) {
         appResponse.set( "Content-Type", "text/css" ).status( 200 ).send( sqsTemplate.getSiteCss() );
+
+        return;
+    }
+
+    // CSS Source Maps
+    if ( rCssMap.test( appRequest.params[ 0 ] ) ) {
+        appResponse.redirect( ("/styles" + appRequest.params[ 0 ]) );
 
         return;
     }
