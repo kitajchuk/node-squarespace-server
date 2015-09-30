@@ -38,19 +38,27 @@ var path = require( "path" ),
     rSQSScripts = /<squarespace:script(.*?)\/\>/g,
     rSQSFootersFull = /<script type="text\/javascript" data-sqs-type="imageloader-bootstraper"\>(.*?)(Squarespace\.afterBodyLoad\(Y\);)<\/script\>/,
     rSQSHeadersFull = /<\!-- This is Squarespace\. -->(.*?)<\!-- End of Squarespace Headers -->/,
+    rSQSSiteCssLink = /<\!--[if \!IE]> -->(.*?)<!-- <\![endif]-->/,
+    rNodeCommentHook = /\/\* node-squarespace-server-rawLess-hook \*\/(.*?)/,
+
     SQS_HEADERS = "{squarespace-headers}",
     SQS_FOOTERS = "{squarespace-footers}",
     SQS_MAIN_CONTENT = "{squarespace.main-content}",
     SQS_PAGE_CLASSES = "{squarespace.page-classes}",
     SQS_PAGE_ID = /\{squarespace\.page-id\}|squarespace\.page-id/g,
     SQS_POST_ENTRY = "{squarespace-post-entry}",
+
     sqsHeaders = [],
     sqsFooters = [],
     sqsUser = null,
     directories = {},
     config = {},
     scripts = [],
-    siteCss = "",
+    stylesheets = {
+        sitecss: [],
+        siteless: [],
+        localcss: ""
+    },
     templates = {
         regions: {},
         collections: {},
@@ -60,7 +68,6 @@ var path = require( "path" ),
     layoutHTML = "",
     updating = {},
 
-    // Default to unique logger incase setLogger isn't called
     sqsLogger = require( "node-squarespace-logger" ),
     sqsMiddleware = require( "node-squarespace-middleware" ),
     sqsUtil = require( "./squarespace-util" ),
@@ -73,6 +80,45 @@ var path = require( "path" ),
 /******************************************************************************
  * @Public
 *******************************************************************************/
+
+
+/**
+ *
+ * @method processTweaks
+ * @public
+ *
+ */
+processTweaks = function () {
+    var tweakData = config.server.siteData.templateTweakSettings,
+        rawLessSplits = tweakData.rawLess.split( rNodeCommentHook ),
+        rawLessSystem = rawLessSplits[ 0 ],
+        rawLessVars = "",
+        tweakName,
+        sep,
+        val,
+        end;
+
+    for ( var id in tweakData.tweakIdMap ) {
+        sep = /^\./.test( tweakData.tweakIdMap[ id ] ) ? "" : ":";
+        val = sep === "" ? "{}" : "none";
+        end = val === "none" ? ";" : "";
+        tweakName = tweakData.tweakIdMap[ id ].replace( /^\.|^@/, "" );
+
+        if ( tweakData.tweakValues[ tweakName ] ) {
+            rawLessVars += (tweakData.tweakIdMap[ id ] + sep + tweakData.tweakValues[ tweakName ] + end + "\n");
+
+        } else if ( tweakData.presets && tweakData.presets[ 0 ] && tweakData.presets[ 0 ].templateTweaks[ tweakName ] ) {
+            rawLessVars += (tweakData.tweakIdMap[ id ] + sep + tweakData.presets[ 0 ].templateTweaks[ tweakName ] + end + "\n");
+
+        } else {
+            rawLessVars += (tweakData.tweakIdMap[ id ] + sep + val + end + "\n");
+        }
+    }
+
+    stylesheets.siteless.push( rawLessVars );
+    stylesheets.siteless.push( rawLessSystem );
+},
+
 
 /**
  *
@@ -195,7 +241,6 @@ replaceAll = function () {
  *
  */
 refresh = function () {
-    //scripts = [];
     sqsHeaders = [];
     sqsFooters = [];
 },
@@ -257,7 +302,7 @@ setUser = function ( user ) {
  *
  */
 getSiteCss = function () {
-    return siteCss;
+    return stylesheets.localcss;
 },
 
 
@@ -795,7 +840,7 @@ compilePages = function ( cb ) {
  *
  */
 compileStylesheets = function ( cb ) {
-    siteCss = "";
+    stylesheets.sitecss = [];
 
     var tmpDir = path.join( directories.styles, ".tmp" ),
         tmpFile = path.join( tmpDir, "site.less" ),
@@ -821,13 +866,11 @@ compileStylesheets = function ( cb ) {
 
     function read() {
         if ( !styles.length ) {
-            sqsUtil.writeFile( tmpFile, siteCss );
+            sqsUtil.writeFile( tmpFile, (stylesheets.siteless.join( "\n" ) + stylesheets.sitecss.join( "\n" )) );
 
             exec( (lessC + " --compress " + tmpFile + " " + outFile), function ( error, stdout, stderr ) {
-                //siteCss = sqsUtil.readFile( outFile );
                 //rimraf.sync( tmpDir );
                 console.log( arguments );
-                //console.log( siteCss );
                 //cb();
             });
 
@@ -840,7 +883,7 @@ compileStylesheets = function ( cb ) {
 
                 } else {
                     sqsUtil.readFile( style.path, function ( data ) {
-                        siteCss += data;
+                        stylesheets.sitecss.push( data );
 
                         read();
                     });
@@ -943,6 +986,9 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
     // Headers?
     if ( sHeadersFull ) {
         sHeadersFull = sHeadersFull[ 0 ];
+
+        // Replace the remote <link /> to site.css
+        sHeadersFull = sHeadersFull.replace( rSQSSiteCssLink, "" );
 
         // Override isWrappedForDamask to ensure public site loads
         if ( config.server.sandbox ) {
@@ -1435,5 +1481,6 @@ module.exports = {
     replaceBlocks: replaceBlocks,
     replaceScripts: replaceScripts,
     renderTemplate: renderTemplate,
-    replaceSQSScripts: replaceSQSScripts
+    replaceSQSScripts: replaceSQSScripts,
+    processTweaks: processTweaks
 };

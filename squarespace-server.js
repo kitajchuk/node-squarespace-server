@@ -389,9 +389,9 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
  */
 onExpressRouterPOST = function ( appRequest, appResponse ) {
     var data = {
-            email: appRequest.body.email,
-            password: appRequest.body.password
-        };
+        email: appRequest.body.email,
+        password: appRequest.body.password
+    };
 
     if ( !data.email || !data.password ) {
         appResponse.send( loginHTML );
@@ -427,6 +427,9 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
                     // Set config on external modules
                     sqsTemplate.setConfig( "server", serverConfig );
+
+                    // Pre-process the API tweak data
+                    sqsTemplate.processTweaks();
 
                     // Store time of login
                     sqsTimeOfLogin = Date.now();
@@ -641,14 +644,14 @@ module.exports = {
             sqsCache.preload(function () {
                 // Preload and process the template
                 sqsTemplate.preload();
-                sqsTemplate.compile(function () {
+                //sqsTemplate.compile(function () {
                     // Watch for template changes
                     sqsTemplate.watch(function () {
                         reloadServer();
                     });
 
                     startServer();
-                });
+                //});
             });
 
             // Watch for changes to template.conf and reload it
