@@ -879,8 +879,6 @@ getTemplateKey = function ( pageJson ) {
         typeName = null,
         regionName = null;
 
-    console.log( pageJson );
-
     // This could happen, I suppose...
     if ( !pageJson ) {
         return template;
