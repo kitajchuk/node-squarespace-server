@@ -19,6 +19,7 @@ var bodyParser = require( "body-parser" ),
     browserSync = require( "browser-sync" ),
     browserSyncPort = 3000,
 
+    rFolder = /^folder/g,
     rProtocol = /^https:|^http:/g,
     rSlash = /^\/|\/$/g,
     rIco = /\.ico$/,
@@ -281,7 +282,7 @@ getFolderRoot = function ( uri ) {
             var link = layout.links[ j ];
 
             // Matched a root level folder uri request
-            if ( link.typeName === "folders" && link.urlId === uri ) {
+            if ( rFolder.test( link.typeName ) && link.urlId === uri ) {
                 ret.folder = true;
                 ret.redirect = ("/" + link.children[ 0 ].urlId + "/");
                 break;
