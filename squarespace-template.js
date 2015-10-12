@@ -1123,7 +1123,8 @@ getNavigationContextItems = function ( links, pageJson ) {
 
     for ( i = 0, iLen = links.length; i < iLen; i++ ) {
         var link = links[ i ],
-            item = null;
+            item = null,
+            temp = null;
 
         // Render item with a collection ID
         if ( link.collectionId ) {
@@ -1138,20 +1139,25 @@ getNavigationContextItems = function ( links, pageJson ) {
                 item.items = [];
 
                 for ( j = 0, jLen = link.children.length; j < jLen; j++ ) {
-                    item.items.push({
-                        active: (link.children[ j ].collectionId === pageJson.collection.id),
-                        folderActive: (link.children[ j ].collectionId === pageJson.collection.id),
-                        collection: lookupCollectionById( link.children[ j ].collectionId )
-                    });
+                    if ( link.children[ j ].collectionId ) {
+                        item.items.push({
+                            active: (link.children[ j ].collectionId === pageJson.collection.id),
+                            folderActive: (link.children[ j ].collectionId === pageJson.collection.id),
+                            collection: lookupCollectionById( link.children[ j ].collectionId )
+                        });
 
-                    // Need active folder when collection in a folder is active
-                    if ( link.children[ j ].collectionId === pageJson.collection.id ) {
-                        item.active = (link.children[ j ].collectionId === pageJson.collection.id);
-                        item.folderActive = (link.children[ j ].collectionId === pageJson.collection.id);
+                    // externalLink?
+                    } else {
+                        temp = sqsUtil.copy( link.children[ j ] );
+                        temp.active = (link.children[ j ].title === pageJson.collection.title);
+                        temp.folderActive = (link.children[ j ].title === pageJson.collection.title);
+
+                        item.items.push( temp );
                     }
                 }
             }
 
+        // externalLink?
         } else {
             item = sqsUtil.copy( link );
             item.active = (link.title === pageJson.collection.title);
