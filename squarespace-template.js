@@ -478,6 +478,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
         // This wraps the matched page template with the default or set region
         rendered += templates.regions[ regionKey ].replace( SQS_MAIN_CONTENT, templates.pages[ templateKey ] );
 
+    // 0.3 => Template is a region
     } else {
         rendered += templates.regions[ templateKey ];
     }
@@ -903,6 +904,11 @@ getTemplateKey = function ( pageJson ) {
         // Handle static page
         if ( pageJson.collection.type === sqsCollectiontypes.TEMPLATE_PAGE ) {
             template = (typeName + ".page");
+
+        // Handle collection without children
+        // This is a fallback in case the conditions above don't capture the collection...
+        } else if ( pageJson.collection.type === sqsCollectiontypes.COLLECTION_TYPE_GENERIC ) {
+            template = (typeName + ".list");
 
         } else {
             template = (regionName + ".region");
