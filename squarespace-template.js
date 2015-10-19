@@ -8,7 +8,7 @@ var path = require( "path" ),
     less = require( "less" ),
     mustache = require( "mustache" ),
 
-    rIndexFolder = /index|folder/g,
+    rIndexFolder = /^folder|^index/,
     rMetaLeft = /\{\.meta-left\}/g,
     rMetaRight = /\{\.meta-right\}/g,
     rSlash = /^\/|\/$/g,
@@ -417,6 +417,20 @@ replaceSQSScripts = function () {
                 filed = '<script src="' + block + '"></script>';
 
                 templates.collections[ i ] = templates.collections[ i ].replace( matched[ j ], filed );
+            }
+        }
+    }
+
+    for ( var i in templates.pages ) {
+        matched = templates.pages[ i ].match( rSQSScripts );
+
+        if ( matched ) {
+            for ( var j = 0, len = matched.length; j < len; j++ ) {
+                attrs = sqsUtil.getAttrObj( matched[ j ] );
+                block = ( "/scripts/" + attrs.src );
+                filed = '<script src="' + block + '"></script>';
+
+                templates.pages[ i ] = templates.pages[ i ].replace( matched[ j ], filed );
             }
         }
     }
@@ -981,43 +995,27 @@ setHeaderFooterTokens = function ( pageJson, pageHtml ) {
  *
  */
 replaceNavigations = function ( rendered, pageJson ) {
-    var context = {
-            active: false,
-            folderActive: false,
-            website: pageJson.website,
-            items: [],
-            extras: {},
-            nodeServer: true
-        },
+    var navigation,
+        template,
+        context,
+        matched,
         block,
         attrs,
-        matched,
-        template,
-        i,
-        iLen,
-        j;
+        i;
 
     // SQS Navigations
     matched = rendered.match( rSQSNavis );
 
     if ( matched ) {
-        for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
+        i = matched.length;
+
+        for ( i; i--; ) {
             attrs = sqsUtil.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
             template = templates.blocks[ block ];
-
-            for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
-                // Ensure the identifier is for THIS navigation ID
-                if ( config.server.siteData.siteLayout.layout[ j ].identifier === attrs.navigationId ) {
-                    context.items = getNavigationContextItems(
-                        config.server.siteData.siteLayout.layout[ j ].links,
-                        pageJson
-                    );
-                }
-            }
-
+            navigation = getIdentifiedNavigation( attrs.navigationId, pageJson );
+            context = getNavigationContext( navigation, pageJson );
             template = sqsJsonTemplate.render( template, context );
-
             rendered = rendered.replace( matched[ i ], template );
         }
     }
@@ -1030,70 +1028,73 @@ replaceNavigations = function ( rendered, pageJson ) {
  *
  * @method replaceFolderNavigations
  * @param {string} rendered The template rendering
- * @param {string} pageJson The JSON for the page
+ * @param {object} pageJson The JSON for the page
  * @returns {string}
  * @private
  *
  */
 replaceFolderNavigations = function ( rendered, pageJson ) {
-    var context = {
-            active: false,
-            folderActive: false,
-            website: pageJson.website,
-            items: [],
-            extras: {},
-            nodeServer: true
-        },
-        block,
-        attrs,
-        matched,
+    var navigation,
         template,
-        i,
-        iLen,
-        j,
-
-        nav,
+        context,
+        layouts,
+        matched,
+        layout,
+        attrs,
+        block,
+        child,
         links,
         link,
-
+        i,
+        j,
         k,
-        l,
-
-        child;
+        l;
 
     // SQS Folder Navigations
     matched = rendered.match( rSQSFolderNavis );
+    layouts = config.server.siteData.siteLayout.layout;
+    j = layouts.length;
 
     if ( matched ) {
-        for ( i = 0, iLen = matched.length; i < iLen; i++ ) {
+        i = matched.length;
+
+        for ( i; i--; ) {
             attrs = sqsUtil.getAttrObj( matched[ i ] );
             block = (attrs.template + ".block");
             template = templates.blocks[ block ];
 
             // Iterate over SiteLayout indexes/folders
             // Find index/folder that has current collection as child
-            // Use that children array to render the navigation
+            // Use that `children` array to render the navigation
 
-            // Iterates over ALL registered navigations in a site
-            for ( j = config.server.siteData.siteLayout.layout.length; j--; ) {
-                nav = config.server.siteData.siteLayout.layout[ j ];
-                links = nav.links;
+            for ( j; j--; ) {
+                layout = layouts[ j ];
+                links = layout.links;
+                k = links.length;
 
-                for ( k = links.length; k--; ) {
+                // Skip hidden navigations
+                //if ( layout.identifier === "_hidden" ) {
+                //    continue;
+                //}
+
+                for ( k; k--; ) {
                     link = links[ k ];
 
                     if ( rIndexFolder.test( link.typeName ) ) {
                         // Indexes and Folders can potentially NOT have children
                         // https://github.com/NodeSquarespace/node-squarespace-server/issues/130
                         if ( link.children ) {
-                            for ( l = link.children.length; l--; ) {
+                            l = link.children.length;
+
+                            for ( l; l--; ) {
                                 child = link.children[ l ];
 
                                 if ( child.collectionId === pageJson.collection.id ) {
-                                    context.items = getNavigationContextItems(
-                                        link.children,
-                                        pageJson
-                                    );
+                                    // Grab the navigation layout ID
+                                    navigation = getIdentifiedNavigation( layout.identifier, pageJson );
+
+                                    // Grab the context object and override the `items` it will return with
+                                    context = getNavigationContext( navigation, pageJson, link.children );
                                 }
                             }
                         }
@@ -1101,8 +1102,8 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
                 }
             }
 
-            template = sqsJsonTemplate.render( template, context );
-
+            // If no `context` was found, don't render
+            template = (context ? sqsJsonTemplate.render( template, context ) : "");
             rendered = rendered.replace( matched[ i ], template );
         }
     }
@@ -1113,19 +1114,101 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
 
 /**
  *
+ * @method getIdentifiedNavigation
+ * @description Retrieve a base navigation `layout` object
+ * @param {string} navId The unique identifier for the navigation
+ * @param {object} pageJson The JSON for the page
+ * @returns {object}
+ * @private
+ *
+ */
+getIdentifiedNavigation = function ( navId, pageJson ) {
+    var layouts = config.server.siteData.siteLayout.layout,
+        nav = null,
+        i = layouts.length;
+
+    for ( i; i--; ) {
+        if ( layouts[ i ].identifier === navId ) {
+            nav = layouts[ i ];
+            break;
+        }
+    }
+
+    return nav;
+},
+
+
+/**
+ *
+ * @method getNavigationContext
+ * @description Retrieve a base navigation context object
+ * @param {object} navigation The navigation `layout` object
+ * @param {object} pageJson The JSON for the page
+ * @param {array} pageLinks Optional override links to work with
+ * @returns {object}
+ * @private
+ *
+ */
+getNavigationContext = function ( navigation, pageJson, pageLinks ) {
+    var navContext = getNavigationContextItems( navigation, (pageLinks || navigation.links), pageJson ),
+        context = {
+            items: navContext.items,
+            extras: {},
+            active: false,
+            website: pageJson.website,
+            nodeServer: true,
+            folderActive: navContext.isFolderActive
+        };
+
+    return context;
+},
+
+
+/**
+ *
  * @method getNavigationContextItems
+ * @param {object} navigation The navigation layout object
  * @param {array} links The list of links for a navigation tree
- * @param {string} pageJson The JSON for the page
+ * @param {object} pageJson The JSON for the page
  * @returns {array}
  * @private
  *
  */
-getNavigationContextItems = function ( links, pageJson ) {
-    var items = [],
+getNavigationContextItems = function ( navigation, links, pageJson ) {
+    var iLen,
+        jLen,
+        ret = {
+            items: [],
+            isFolderActive: false
+        },
         i,
-        iLen,
-        j,
-        jLen;
+        j;
+
+    // This is for setting the root level `folderActive`
+    function isLinkInNavigation( link, navi ) {
+        var ret = false,
+            k,
+            l;
+
+        if ( navi.links ) {
+            k = navi.links.length;
+
+            for ( k; k--; ) {
+                if ( navi.links[ k ].children ) {
+                    l = navi.links[ k ].children.length;
+
+                    for ( l; l--; ) {
+                        if ( rIndexFolder.test( navi.links[ k ].typeName ) && navi.links[ k ].children[ l ].collectionId === link.collectionId ) {
+                            ret = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return ret;
+    }
 
     for ( i = 0, iLen = links.length; i < iLen; i++ ) {
         var link = links[ i ],
@@ -1134,9 +1217,14 @@ getNavigationContextItems = function ( links, pageJson ) {
 
         // Render item with a collection ID
         if ( link.collectionId ) {
+            // @folderActive?
+            if ( isLinkInNavigation( link, navigation ) ) {
+                ret.isFolderActive = true;
+            }
+
             item = {
-                active: (link.collectionId === pageJson.collection.id),
-                folderActive: (link.collectionId === pageJson.collection.id),
+                active: ((!rIndexFolder.test( link.typeName )) && link.collectionId === pageJson.collection.id),
+                folderActive: (rIndexFolder.test( link.typeName )) && (link.collectionId === pageJson.collection.id),
                 collection: lookupCollectionById( link.collectionId )
             };
 
@@ -1146,17 +1234,24 @@ getNavigationContextItems = function ( links, pageJson ) {
 
                 for ( j = 0, jLen = link.children.length; j < jLen; j++ ) {
                     if ( link.children[ j ].collectionId ) {
+                        // @folderActive?
+                        // This also needs to set the {item} `folderActive` as well
+                        if ( (rIndexFolder.test( link.typeName )) && (link.children[ j ].collectionId === pageJson.collection.id) ) {
+                            ret.isFolderActive = true;
+                            item.folderActive = true;
+                        }
+
                         item.items.push({
                             active: (link.children[ j ].collectionId === pageJson.collection.id),
-                            folderActive: (link.children[ j ].collectionId === pageJson.collection.id),
+                            folderActive: false,
                             collection: lookupCollectionById( link.children[ j ].collectionId )
                         });
 
                     // externalLink?
                     } else {
                         temp = sqsUtil.copy( link.children[ j ] );
-                        temp.active = (link.children[ j ].title === pageJson.collection.title);
-                        temp.folderActive = (link.children[ j ].title === pageJson.collection.title);
+                        temp.active = false;
+                        temp.folderActive = false;
 
                         item.items.push( temp );
                     }
@@ -1166,14 +1261,15 @@ getNavigationContextItems = function ( links, pageJson ) {
         // externalLink?
         } else {
             item = sqsUtil.copy( link );
-            item.active = (link.title === pageJson.collection.title);
-            item.folderActive = (link.title === pageJson.collection.title);
+            item.active = false;
+            item.folderActive = false;
         }
 
-        items.push( item );
+        // Push to `items` stack
+        ret.items.push( item );
     }
 
-    return items;
+    return ret;
 },
 
 

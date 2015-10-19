@@ -19,7 +19,7 @@ var bodyParser = require( "body-parser" ),
     browserSync = require( "browser-sync" ),
     browserSyncPort = 3000,
 
-    rFolder = /^folder/g,
+    rIndexFolder = /^folder|^index/,
     rProtocol = /^https:|^http:/g,
     rSlash = /^\/|\/$/g,
     rIco = /\.ico$/,
@@ -274,15 +274,15 @@ getFolderRoot = function ( uri ) {
         }
 
         // Skip hidden navigations
-        if ( layout.identifier === "_hidden" ) {
-            continue;
-        }
+        //if ( layout.identifier === "_hidden" ) {
+        //    continue;
+        //}
 
         for ( var j = layout.links.length; j--; ) {
             var link = layout.links[ j ];
 
             // Matched a root level folder uri request
-            if ( rFolder.test( link.typeName ) && link.urlId === uri ) {
+            if ( rIndexFolder.test( link.typeName ) && link.urlId === uri ) {
                 ret.folder = true;
                 ret.redirect = ("/" + link.children[ 0 ].urlId + "/");
                 break;

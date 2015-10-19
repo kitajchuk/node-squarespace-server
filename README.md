@@ -17,6 +17,7 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
  
 
 #### Recent Updates
+- Fix bug in setting `folderActive` for navigation context's
 - Fix bug in capturing `externalLinks` in navigation render
 - Fix bug in replicating a folder root uri
 - Support more predicates:
