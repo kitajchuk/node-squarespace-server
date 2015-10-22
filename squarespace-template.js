@@ -1037,18 +1037,11 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
     var navigation,
         template,
         context,
-        layouts,
         matched,
         layout,
         attrs,
         block,
-        child,
-        links,
-        link,
-        i,
-        j,
-        k,
-        l;
+        i;
 
     // SQS Folder Navigations
     matched = rendered.match( rSQSFolderNavis );
@@ -1067,28 +1060,13 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
             // Find index/folder that has current collection as child
             // Use that `children` array to render the navigation
 
-            for ( j; j--; ) {
-                layout = layouts[ j ];
-                links = layout.links;
-                k = links.length;
-
-                // Skip hidden navigations
-                //if ( layout.identifier === "_hidden" ) {
-                //    continue;
-                //}
-
-                for ( k; k--; ) {
-                    link = links[ k ];
-
+            layouts.forEach(function ( layout ) {
+                layout.links.forEach(function ( link ) {
                     if ( rIndexFolder.test( link.typeName ) ) {
                         // Indexes and Folders can potentially NOT have children
                         // https://github.com/NodeSquarespace/node-squarespace-server/issues/130
                         if ( link.children ) {
-                            l = link.children.length;
-
-                            for ( l; l--; ) {
-                                child = link.children[ l ];
-
+                            link.children.forEach(function ( child ) {
                                 if ( child.collectionId === pageJson.collection.id ) {
                                     // Grab the navigation layout ID
                                     navigation = getIdentifiedNavigation( layout.identifier, pageJson );
@@ -1096,11 +1074,11 @@ replaceFolderNavigations = function ( rendered, pageJson ) {
                                     // Grab the context object and override the `items` it will return with
                                     context = getNavigationContext( navigation, pageJson, link.children );
                                 }
-                            }
+                            });
                         }
                     }
-                }
-            }
+                });
+            });
 
             // If no `context` was found, don't render
             template = (context ? sqsJsonTemplate.render( template, context ) : "");
