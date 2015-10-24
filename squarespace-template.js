@@ -1355,7 +1355,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                         rendered = rendered.replace( blockMatch, layout );
 
-                        sqsCache.set( ("block-" + blockAttrs.id + ".html"), layout );
+                        sqsCache.set( ("block-" + blockAttrs.id + ".html"), layout, false );
 
                         if ( !matched.length ) {
                             callback( rendered );

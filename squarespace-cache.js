@@ -24,11 +24,15 @@ util.isFile( root, function ( exists ) {
 
 // Export
 module.exports = {
-    set: function ( key, val ) {
+    set: function ( key, val, minify ) {
+        // Support an optional parameter to optionally minify
+        // Default if `undefined` is `true` to perform minify
+        minify = minify === undefined ? true : minify;
+
         logger.log( "cache", ("Store local cache for key => " + key) );
 
         var write = rJson.test( key ) ? util.writeJson : util.writeFile,
-            value = rJson.test( key ) ? val : util.packStr( val );
+            value = rJson.test( key ) || !minify ? val : util.packStr( val );
 
         cache[ key ] = value;
 
