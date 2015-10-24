@@ -827,7 +827,7 @@ compileStylesheets = function ( cb ) {
             cb();
 
         } else {
-            var style = styles.pop();
+            var style = styles.shift();
 
             sqsUtil.isFile( style.path, function ( exists ) {
                 if ( !exists ) {
