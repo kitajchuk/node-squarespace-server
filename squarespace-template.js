@@ -1153,45 +1153,42 @@ getNavigationContext = function ( navigation, pageJson, pageLinks ) {
  *
  */
 getNavigationContextItems = function ( navigation, links, pageJson ) {
-    var iLen,
-        jLen,
-        ret = {
-            items: [],
-            isFolderActive: false
-        },
-        i,
-        j;
+    var ret = {
+        items: [],
+        isFolderActive: false
+    };
 
     // This is for setting the root level `folderActive`
     function isLinkInNavigation( link, navi ) {
-        var ret = false,
-            k,
-            l;
+        var ret = false;
 
         if ( navi.links ) {
-            k = navi.links.length;
-
-            for ( k; k--; ) {
-                if ( navi.links[ k ].children ) {
-                    l = navi.links[ k ].children.length;
-
-                    for ( l; l--; ) {
-                        if ( rIndexFolder.test( navi.links[ k ].typeName ) && navi.links[ k ].children[ l ].collectionId === link.collectionId ) {
-                            ret = true;
-                            break;
-                        }
-                    }
+            navi.links.forEach(function ( naviLink ) {
+                if ( ret ) {
+                    return;
                 }
-            }
+
+                if ( naviLink.children ) {
+                    naviLink.children.forEach(function ( child ) {
+                        if ( rIndexFolder.test( naviLink.typeName ) && child.collectionId === link.collectionId ) {
+                            ret = true;
+                        }
+                    });
+                }
+            });
         }
 
         return ret;
     }
 
-    for ( i = 0, iLen = links.length; i < iLen; i++ ) {
-        var link = links[ i ],
-            item = null,
+    links.forEach(function ( link ) {
+        var item = null,
             temp = null;
+
+        // Ignore disabled links
+        if ( !link.enabled ) {
+            return;
+        }
 
         // Render item with a collection ID
         if ( link.collectionId ) {
@@ -1210,30 +1207,35 @@ getNavigationContextItems = function ( navigation, links, pageJson ) {
             if ( link.children ) {
                 item.items = [];
 
-                for ( j = 0, jLen = link.children.length; j < jLen; j++ ) {
-                    if ( link.children[ j ].collectionId ) {
+                link.children.forEach(function ( child ) {
+                    // Ignore disabled children
+                    if ( !child.enabled ) {
+                        return;
+                    }
+
+                    if ( child.collectionId ) {
                         // @folderActive?
                         // This also needs to set the {item} `folderActive` as well
-                        if ( (rIndexFolder.test( link.typeName )) && (link.children[ j ].collectionId === pageJson.collection.id) ) {
+                        if ( (rIndexFolder.test( link.typeName )) && (child.collectionId === pageJson.collection.id) ) {
                             ret.isFolderActive = true;
                             item.folderActive = true;
                         }
 
                         item.items.push({
-                            active: (link.children[ j ].collectionId === pageJson.collection.id),
+                            active: (child.collectionId === pageJson.collection.id),
                             folderActive: false,
-                            collection: lookupCollectionById( link.children[ j ].collectionId )
+                            collection: lookupCollectionById( child.collectionId )
                         });
 
                     // externalLink?
                     } else {
-                        temp = sqsUtil.copy( link.children[ j ] );
+                        temp = sqsUtil.copy( child );
                         temp.active = false;
                         temp.folderActive = false;
 
                         item.items.push( temp );
                     }
-                }
+                });
             }
 
         // externalLink?
@@ -1245,7 +1247,7 @@ getNavigationContextItems = function ( navigation, links, pageJson ) {
 
         // Push to `items` stack
         ret.items.push( item );
-    }
+    });
 
     return ret;
 },
