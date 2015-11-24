@@ -1185,8 +1185,6 @@ getNavigationContextItems = function ( navigation, links, pageJson ) {
         var item = null,
             temp = null;
 
-        console.log( link );
-
         // Ignore disabled links
         // Account for `externalLinks` being flagged as disabled
         if ( link.enabled === false && link.externalLink === undefined ) {
