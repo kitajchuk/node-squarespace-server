@@ -10,13 +10,14 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
 
 ### Release
 ***Using the latest package versions is always recommended.***
-- [node-squarespace-server@0.4.15](https://www.npmjs.com/package/node-squarespace-server)
- - [node-squarespace-jsont@0.1.20](https://www.npmjs.com/package/node-squarespace-jsont)
+- [node-squarespace-server@0.4.16](https://www.npmjs.com/package/node-squarespace-server)
+ - [node-squarespace-jsont@0.1.21](https://www.npmjs.com/package/node-squarespace-jsont)
  - [node-squarespace-logger@0.1.1](https://www.npmjs.com/package/node-squarespace-logger)
  - [node-squarespace-middleware@0.2.3](https://www.npmjs.com/package/node-squarespace-middleware)
  
 
 #### Recent Updates
+- Support the `or` operator with `if` statements: `{.if foo || bar || baz}`
 - Support the `index?` predicate for templates
 - Add `?nodata` query string support to re-fetch site layout
 - Fix bug in rendering `disabled` links in navigations
