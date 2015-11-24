@@ -19,6 +19,9 @@ var bodyParser = require( "body-parser" ),
     browserSync = require( "browser-sync" ),
     browserSyncPort = 3000,
 
+    rJson = /^json/,
+    rIndex = /^index/,
+    rFolder = /^folder/,
     rIndexFolder = /^folder|^index/,
     rProtocol = /^https:|^http:/g,
     rSlash = /^\/|\/$/g,
@@ -31,6 +34,7 @@ var bodyParser = require( "body-parser" ),
     sqsTimeOfLogin = null,
     sqsTimeLoggedIn = 86400000,
     directories = {},
+    keyFiles = {},
     templateConfig = null,
     serverConfig = null,
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
@@ -120,6 +124,12 @@ setDirectories = function () {
         presets: path.join( serverConfig.webroot, "presets" )
     };
 
+    // @global - keyFiles
+    keyFiles = {
+        indexList: fs.existsSync( path.join( directories.collections, "index.list" ) ),
+        folderList: fs.existsSync( path.join( directories.collections, "folder.list" ) )
+    };
+
     // Set directories on external modules
     sqsTemplate.setDirs( directories );
 },
@@ -164,6 +174,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
         sqsCache.remove( (cacheName + ".html") );
         sqsCache.remove( (cacheName + ".json") );
+        sqsCache.remove( (cacheName + "-main-content.html") );
     }
 
     // Search?
@@ -189,7 +200,7 @@ renderResponse = function ( appRequest, appResponse ) {
     }
 
     // Cache?
-    if ( cacheJson && cacheHtml && appRequest.query.format !== "json" ) {
+    if ( cacheJson && cacheHtml && !rJson.test( appRequest.query.format ) ) {
         sqsTemplate.renderTemplate( qrs, cacheJson, cacheHtml, function ( tpl ) {
             appResponse.status( 200 ).send( tpl );
         });
@@ -198,7 +209,8 @@ renderResponse = function ( appRequest, appResponse ) {
     }
 
     // JSON?
-    if ( appRequest.query.format === "json" ) {
+    // Supports `json` and `json-pretty`
+    if ( rJson.test( appRequest.query.format ) ) {
         if ( cacheJson ) {
             cacheJson.nodeServer = true;
 
@@ -216,6 +228,27 @@ renderResponse = function ( appRequest, appResponse ) {
                 } else {
                     // Handle errors
                     sqsLogger.log( "error", ("Error requesting page json => " + error) );
+                }
+            });
+        }
+
+    // Main-Content
+    } else if ( appRequest.query.format === "main-content" ) {
+        cacheHtml = sqsCache.get( (cacheName + "-main-content.html") );
+
+        if ( cacheHtml ) {
+            appResponse.status( 200 ).send( cacheHtml );
+
+        } else {
+            sqsMiddleware.getHtml( url, qrs, function ( error, data ) {
+                if ( !error ) {
+                    appResponse.status( 200 ).send( data.html );
+
+                    sqsCache.set( (cacheName + "-main-content.html"), data.html );
+
+                } else {
+                    // Handle errors
+                    sqsLogger.log( "error", ("Error requesting main-content for page => " + error) );
                 }
             });
         }
@@ -246,6 +279,23 @@ renderResponse = function ( appRequest, appResponse ) {
             }
         });
     }
+},
+
+
+/**
+ *
+ * @method refreshAndRender
+ * @param {object} appRequest The express request
+ * @param {object} appResponse The express response
+ * @private
+ *
+ */
+refreshAndRender = function ( appRequest, appResponse ) {
+    // Run the template compiler
+    sqsTemplate.refresh();
+
+    // Render the response
+    renderResponse( appRequest, appResponse );
 },
 
 
@@ -283,9 +333,17 @@ getFolderRoot = function ( uri ) {
 
             // Matched a root level folder uri request
             if ( rIndexFolder.test( link.typeName ) && link.urlId === uri ) {
-                ret.folder = true;
-                ret.redirect = ("/" + link.children[ 0 ].urlId + "/");
-                break;
+                if ( rFolder && keyFiles.folderList ) {
+                    break;
+
+                } else if ( rIndex && keyFiles.indexList ) {
+                    break;
+
+                } else {
+                    ret.folder = true;
+                    ret.redirect = ("/" + link.children[ 0 ].urlId + "/");
+                    break;
+                }
             }
         }
     }
@@ -380,11 +438,16 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
         return;
     }
 
-    // Run the template compiler
-    sqsTemplate.refresh();
+    // Re-fetch the datas
+    if ( appRequest.query.nodata !== undefined ) {
+        fetchSiteAPIData(function () {
+            refreshAndRender( appRequest, appResponse );
+        });
 
-    // Render the response
-    renderResponse( appRequest, appResponse );
+        return;
+    }
+
+    refreshAndRender( appRequest, appResponse );
 },
 
 
@@ -424,31 +487,15 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
     sqsMiddleware.doLogin(function ( error, headers ) {
         if ( !error ) {
             sqsLogger.log( "info", "...Logged in to Squarespace" );
-            sqsLogger.log( "info", "Fetching data from Squarespace..." );
 
-            // Fetch site API data
-            sqsMiddleware.getAPIData( function ( error, data ) {
-                if ( !error ) {
-                    sqsLogger.log( "info", "...Fetched data from Squarespace" );
+            fetchSiteAPIData(function () {
+                // Store time of login
+                sqsTimeOfLogin = Date.now();
 
-                    // Store the site data needed
-                    serverConfig.siteData = data;
-
-                    // Set config on external modules
-                    sqsTemplate.setConfig( "server", serverConfig );
-
-                    // Store time of login
-                    sqsTimeOfLogin = Date.now();
-
-                    // End login post
-                    appResponse.json({
-                        success: true
-                    });
-
-                } else {
-                    // Handle errors
-                    sqsLogger.log( "error", ("Error fetching data from Squarespace => " + error) );
-                }
+                // End login post
+                appResponse.json({
+                    success: true
+                });
             });
 
         } else {
@@ -457,6 +504,39 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
 
             // Reload login
             appResponse.redirect( "/" );
+        }
+    });
+},
+
+
+/**
+ *
+ * @method fetchSiteAPIData
+ * @param {function} callback Optional function to handle success
+ * @private
+ *
+ */
+fetchSiteAPIData = function ( callback ) {
+    sqsLogger.log( "info", "Fetching data from Squarespace..." );
+
+    // Fetch site API data
+    sqsMiddleware.getAPIData( function ( error, data ) {
+        if ( !error ) {
+            sqsLogger.log( "info", "...Fetched data from Squarespace" );
+
+            // Store the site data needed
+            serverConfig.siteData = data;
+
+            // Set config on external modules
+            sqsTemplate.setConfig( "server", serverConfig );
+
+            if ( typeof callback === "function" ) {
+                callback();
+            }
+
+        } else {
+            // Handle errors
+            sqsLogger.log( "error", ("Error fetching data from Squarespace => " + error) );
         }
     });
 },

@@ -17,6 +17,7 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
  
 
 #### Recent Updates
+- Add `?nodata` query string support to re-fetch site layout
 - Fix bug in rendering `disabled` links in navigations
 - Fix bug in setting `folderActive` for navigation context's
 - Fix bug in capturing `externalLinks` in navigation render
