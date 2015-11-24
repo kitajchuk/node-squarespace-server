@@ -1185,8 +1185,11 @@ getNavigationContextItems = function ( navigation, links, pageJson ) {
         var item = null,
             temp = null;
 
+        console.log( link );
+
         // Ignore disabled links
-        if ( !link.enabled ) {
+        // Account for `externalLinks` being flagged as disabled
+        if ( link.enabled === false && link.externalLink === undefined ) {
             return;
         }
 
@@ -1209,7 +1212,7 @@ getNavigationContextItems = function ( navigation, links, pageJson ) {
 
                 link.children.forEach(function ( child ) {
                     // Ignore disabled children
-                    if ( !child.enabled ) {
+                    if ( child.enabled === false && child.externalLink === undefined ) {
                         return;
                     }
 
