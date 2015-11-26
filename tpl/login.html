@@ -7,12 +7,12 @@
     <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1" />
 
     <!-- Title -->
-    <title>Login to Squarespace</title>
+    <title>Authenticate with your Squarespace credentials</title>
 
     <style type="text/css">
         body,
         html {
-            background-color: #f2f2f2;
+            background-color: #000000;
             font-family: "Helvetica Neue", sans-serif;
             height: 100%;
             margin: 0;
@@ -20,25 +20,72 @@
             padding: 0;
             width: 100%;
         }
+        body {
+    	    display: -webkit-flex;
+		    display: -ms-flexbox;
+		    display: flex;
+		    -webkit-flex-wrap: nowrap;
+		    -ms-flex-wrap: nowrap;
+		    flex-wrap: nowrap;
+		    -webkit-flex-direction: row;
+		    -ms-flex-direction: row;
+		        flex-direction: row;
+		    -webkit-align-items: center;
+		    -ms-flex-align: center;
+		        align-items: center;
+		    -webkit-justify-content: center;
+		    -ms-flex-pack: center;
+		        justify-content: center;
+        }
         h1 {
             margin: 0;
             font-size: 18px;
             line-height: 1;
         }
         p {
-            margin: 20px 0;
-            font-size: 13px;
-            color: #959595;
+            margin: 22px 0;
+            letter-spacing: 0.03em;
+            line-height: 1.45em;
+            font-size: 12px;
+            color: #777777;
+        }
+        a {
+        	color: inherit;
+            transition: color 400ms ease-out;
+            -webkit-transition: color 400ms ease-out;
+        }
+		a:hover {
+			color: #888888;
+		}
+        p strong {
+        	color: #888888;
+        	font-size: 13px;
+        }
+        p.disclaimer {
+        	bottom: 0;
+        	color: #666666;
+        	font-size: 11px;
+        	left: 0;
+        	margin: 0;
+        	padding: 10px;
+        	position: absolute;
+        	right: 0;
+        	text-align: center;
+        	width: 100%;
         }
         input {
-            background-color: #fff;
+            background-color: transparent;
             border: none;
-            color: #3e3e3e;
+            border-bottom: 1px solid #3e3e3e;
+            color: #a1a1a1;
             display: block;
             font-family: "Helvetica Neue", sans-serif;
             font-size: 13px;
-            margin-bottom: 10px;
-            padding: 10px;
+		    height: 44px;
+            letter-spacing: 0.03em;
+		    line-height: 22px;
+            margin-bottom: 12px;
+		    padding: 11px;
             width: 100%;
             box-sizing: border-box;
             transition: border-color 400ms ease-out;
@@ -49,7 +96,8 @@
             outline: none;
         }
         input:focus {
-            border-color: #000;
+            border-color: #FFFFFF;
+            color: #FFFFFF;
         }
         button {
             border: 0;
@@ -60,28 +108,29 @@
             outline: none;
         }
         .btn {
-            background-color: #3e3e3e;
-            color: #fff;
+            background-color: #e4e4e4;
+            color: #3e3e3e;
             display: inline-block;
             font-family: "Helvetica Neue", sans-serif;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: normal;
-            margin-top: 10px;
-            padding: 10px 40px;
-            border-radius: 100px;
+            letter-spacing: 0.03em;
+            line-height: 22px;
+            margin-top: 22px;
+            padding: 11px 44px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            cursor: pointer;
             box-sizing: border-box;
             transition: background-color 400ms ease-out;
             -webkit-transition: background-color 400ms ease-out;
         }
         .btn:hover {
-            background-color: #000;
+            background-color: #FFFFFF;
         }
         #login {
-            left: 50%;
-            margin: -113px 0 0 -160px;
-            position: absolute;
-            top: 50%;
-            width: 320px;
+            width: 374px;
+            padding: 22px 33px;
             opacity: 0;
             text-align: center;
             transition: opacity 400ms ease-out;
@@ -137,19 +186,13 @@
                 -webkit-transform: scale(1.0);
             }
         }
-        @media only screen and ( max-width: 640px ) {
-            #login {
-                left: 0;
-                margin: -113px 10% 0 10%;
-                width: 80%;
-            }
-        }
     </style>
     </head>
     <body>
         <form id="login" action="/" method="post">
-            <h1>Login to Squarespace</h1>
-            <p>Your user info will not be stored anywhere. This authentication simply retrieves data for your site.</p>
+        	<svg version="1.1" id="logo-squarespace" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"x="0px" y="0px" viewBox="0 0 41.1 32.9" style="enable-background:new 0 0 41.1 32.9;" xml:space="preserve" width="41px" height="33px"> <path style="fill:#FFFFFF;" d="M26.1,9.4c0.8-0.8,0.8-2,0-2.8c-0.8-0.8-2-0.8-2.8,0c-0.1,0.1-0.2,0.2-0.3,0.3 L10.7,19.3c-1.6,1.6-4.1,1.6-5.6,0c-1.6-1.6-1.6-4.1,0-5.6l12-12.1C15.6,0,13,0,11.5,1.5l-9.2,9.3c-3.1,3.1-3.1,8.2,0,11.3 c3.1,3.1,8.1,3.1,11.2,0L26.1,9.4z M6.5,15c-0.8,0.8-0.8,2,0,2.8c0.8,0.8,2,0.8,2.9,0L22,5.2c1.5-1.5,3.8-1.6,5.4-0.2l0.2,0.2 c0.8,0.8,2,0.8,2.8,0c0.8-0.8,0.8-2,0.1-2.8c-3.1-3.1-8.1-3.1-11.2,0L6.8,14.8C6.7,14.8,6.6,14.9,6.5,15z M34.5,15 c-0.8-0.8-2-0.8-2.8,0c-0.1,0.1-0.2,0.2-0.3,0.3L19.2,27.7c-1.5,1.6-4.1,1.6-5.6,0l-0.1,0c-0.8-0.8-2-0.8-2.8,0 c-0.8,0.8-0.8,2,0,2.8c0.1,0.1,0.2,0.2,0.3,0.3c3.1,2.9,7.9,2.8,11-0.3l12.6-12.7C35.3,17.1,35.3,15.8,34.5,15z M27.6,10.8 L15.2,23.2c-0.1,0.1-0.2,0.2-0.3,0.3c-0.8,0.8-0.8,2,0,2.8c0.8,0.8,2,0.8,2.9,0l12.6-12.7c1.5-1.6,4.1-1.6,5.6,0 c1.6,1.6,1.6,4.1,0,5.6L24,31.4c1.5,1.6,4.1,1.6,5.6,0l9.2-9.3c3.1-3.1,3.1-8.2,0-11.3C35.7,7.7,30.7,7.7,27.6,10.8z"/> </svg>
+            <p><strong>Node Squarespace Server</strong></br>Use your Squarespace credentials to authenticate and retrieve data from your website. Your info will not be stored.</p>
+            
             <input id="email" type="text" name="email" value="" placeholder="Email Address" />
             <input id="password" type="password" name="password" value="" placeholder="Password" />
             <button type="submit" class="btn">Login</button>
@@ -195,5 +238,6 @@
 
             }, 500 );
         </script>
+        <p class="disclaimer">Node Squarespace Server is an <a href="http://github.com/NodeSquarespace" target="_new">open source project</a> that is not endorsed by or affiliated with Squarespace.</p>
     </body>
 </html>
