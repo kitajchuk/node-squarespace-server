@@ -14,8 +14,10 @@ var path = require( "path" ),
     rSlash = /^\/|\/$/g,
     rJsonT = /^\{.*?\}$/,
     rScripts = /<script.*?\>(.*?)<\/script\>/g,
-    rBlockIncs = /\{\@\|apply\s(.*?)\}/g,
-    rBlockTags = /^\{\@\|apply\s|\}$/g,
+    rAt = /@/,
+    rBlockIncs = /\{[@a-zA-Z0-9.-]+?\|apply\s(.*?)\}/g,
+    rBlockRepl = /^\{(.*?)\|apply\s|\}$/g,
+    rBlockCtx = /^\{|\|apply\s(.*)|\}$/g,
     rTplFiles = /\.item$|\.list$|\.region$/,
     rItemOrList = /\.item$|\.list$/,
     rRegions = /\.region$/,
@@ -266,52 +268,39 @@ getSiteCss = function () {
  *
  */
 replaceBlocks = function () {
-    var matched,
-        block;
+    var filesByType = [
+            "regions",
+            "collections",
+            "pages",
+            "blocks"
+        ],
+        replace,
+        matched,
+        block,
+        i,
+        j;
 
-    for ( var i in templates.regions ) {
-        while ( matched = templates.regions[ i ].match( rBlockIncs ) ) {
-            for ( var j = 0, len = matched.length; j < len; j++ ) {
-                block = matched[ j ].replace( rBlockTags, "" );
-                block = templates.blocks[ block ];
+    filesByType.forEach(function ( fileOfType ) {
+        for ( i in templates[ fileOfType ] ) {
+            while ( matched = templates[ fileOfType ][ i ].match( rBlockIncs ) ) {
+                j = matched.length;
 
-                templates.regions[ i ] = templates.regions[ i ].replace( matched[ j ], block );
+                for ( j; j--; ) {
+                    block = matched[ j ].replace( rBlockRepl, "" );
+                    block = templates.blocks[ block ];
+
+                    // Simple replace for @|apply is easy
+                    // Otherwise we need a context wrapper
+                    // foo.bar|apply => {.section foo.bar}...{.end}
+                    if ( !rAt.test( matched[ j ] ) ) {
+                        block = ("{.section " + matched[ j ].replace( rBlockCtx, "" ) + "}" + block + "{.end}");
+                    }
+
+                    templates[ fileOfType ][ i ] = templates[ fileOfType ][ i ].replace( matched[ j ], block );
+                }
             }
         }
-    }
-
-    for ( var i in templates.collections ) {
-        while ( matched = templates.collections[ i ].match( rBlockIncs ) ) {
-            for ( var j = 0, len = matched.length; j < len; j++ ) {
-                block = matched[ j ].replace( rBlockTags, "" );
-                block = templates.blocks[ block ];
-
-                templates.collections[ i ] = templates.collections[ i ].replace( matched[ j ], block );
-            }
-        }
-    }
-
-    for ( i in templates.pages ) {
-        while ( matched = templates.pages[ i ].match( rBlockIncs ) ) {
-            for ( var j = 0, len = matched.length; j < len; j++ ) {
-                block = matched[ j ].replace( rBlockTags, "" );
-                block = templates.blocks[ block ];
-
-                templates.pages[ i ] = templates.pages[ i ].replace( matched[ j ], block );
-            }
-        }
-    }
-
-    for ( i in templates.blocks ) {
-        while ( matched = templates.blocks[ i ].match( rBlockIncs ) ) {
-            for ( var j = 0, len = matched.length; j < len; j++ ) {
-                block = matched[ j ].replace( rBlockTags, "" );
-                block = templates.blocks[ block ];
-
-                templates.blocks[ i ] = templates.blocks[ i ].replace( matched[ j ], block );
-            }
-        }
-    }
+    });
 },
 
 
