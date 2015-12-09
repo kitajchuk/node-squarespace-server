@@ -17,6 +17,7 @@ This tool lets [Squarespace Developers](http://developers.squarespace.com) build
  
 
 #### Recent Updates
+- Support `.sqsrc` file for local user creds - automatic login :)
 - Support the `main-content` query string format
 - Support the `or` operator with `if` statements: `{.if foo || bar || baz}`
 - Support the `index?` predicate for templates
@@ -100,6 +101,7 @@ And you will want to add this to your `.gitignore`:
 ```shell
 # Ignore server cache
 .sqs-cache
+.sqsrc
 ```
 
 #### API
@@ -154,20 +156,20 @@ You can use any front-end workflow you like when working with a custom Squarespa
 ### Login
 You will first be prompted with a login page. Enter your email and password for __YOUR__ Squarespace account ( used for logging into `/config` ) that is associated with __THIS__ Squarespace site. This information is not stored anywhere, it is just used to make some initial requests to retrieve data for your site.
 
+#### sqsrc
+If you want you can create an `.sqsrc` file in the root of your template directory and add your `username` and `password` for logging in automatically. The `json` looks like this:
 
-
-### Logout
-Logging out is easy. Stopping the server will log you out if you are working locally. If you are running the instance on a deployed server, you can always hit `/logout` to logout. You will automatically be logged out after a period of 24 hours.
+```javascript
+{
+    "email": "youruseremail",
+    "password": "youruserpassword"
+}
+```
 
 
 
 ### Performance and Caching
 When you make initial requests to the pages of your site, they will likely be slow. Imagine why. For every page the module needs to request both full `html` (for headers and footers parsing) and `json` (for rendering). That's 2 requests. For every `squarespace:query` and `squarespace:block-field` tag the module must make another request. Well, that's a lot of requests for sure. Luckily, the module caches everything via a `.sqs-cache` directory in your template root. This is good to speed things up. But, sometimes you want to pull down the latest and greatest content from your site. You can do this by hitting any page with a `?nocache` query string. To blow away your entire cache you can either delete it manually or use the `sqs buster` command.
-
-
-
-### Deploy
-All testing of this module has primarily been done locally. Once further testing is completed for running this on a deployed server expect the steps to be listed here.
 
 
 

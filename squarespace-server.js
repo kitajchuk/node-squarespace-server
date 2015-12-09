@@ -30,9 +30,6 @@ var bodyParser = require( "body-parser" ),
     rUniversal = /^\/universal/,
     rClickthroughUrl = /^\/s\//,
     rCssMap = /\.css\.map$/,
-    sqsUser = null,
-    sqsTimeOfLogin = null,
-    sqsTimeLoggedIn = 86400000,
     directories = {},
     keyFiles = {},
     templateConfig = null,
@@ -47,6 +44,18 @@ var bodyParser = require( "body-parser" ),
     sqsTemplate = require( "./squarespace-template" ),
     sqsCache = require( "./squarespace-cache" ),
     package = sqsUtil.readJson( path.join( __dirname, "package.json" ) ),
+
+    sqsUser = null,
+    sqsRcFile = path.join( process.cwd(), ".sqsrc" ),
+    sqsRcConfig = sqsUtil.isFile( sqsRcFile ) ? (function () {
+        try {
+            return sqsUtil.readJson( sqsRcFile );
+
+        } catch ( error ) {
+            return null;
+        }
+
+    })() : null,
 
 
 /**
@@ -406,25 +415,16 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
         return;
     }
 
-    // Logout
-    if ( appRequest.params[ 0 ].replace( rSlash, "" ) === "logout" ) {
-        sqsUser = null;
-
-        appResponse.redirect( "/" );
-
-        return;
-    }
-
     // Authentication
     if ( !sqsUser ) {
-        appResponse.status( 200 ).send( loginHTML );
+        if ( sqsRcConfig ) {
+            appLogin( sqsRcConfig, appResponse, function () {
+                appResponse.redirect( appRequest.params[ 0 ] );
+            });
 
-        return;
-    }
-
-    // Login expired
-    if ( (Date.now() - sqsTimeOfLogin) >= sqsTimeLoggedIn ) {
-        appResponse.redirect( "/logout/" );
+        } else {
+            appResponse.status( 200 ).send( loginHTML );
+        }
 
         return;
     }
@@ -461,9 +461,9 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
  */
 onExpressRouterPOST = function ( appRequest, appResponse ) {
     var data = {
-            email: appRequest.body.email,
-            password: appRequest.body.password
-        };
+        email: appRequest.body.email,
+        password: appRequest.body.password
+    };
 
     if ( !data.email || !data.password ) {
         appResponse.send( loginHTML );
@@ -471,9 +471,25 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
         return;
     }
 
-    // Keep user data in memory
-    sqsUser = data;
+    appLogin( data, appResponse, function () {
+        // End login post
+        appResponse.json({
+            success: true
+        });
+    });
+},
 
+
+/**
+ *
+ * @method onExpressRouterPOST
+ * @param {object} data The dev user data for squarespace
+ * @param {object} appResponse The express response
+ * @param {function} callback The function to call when data is fetched
+ * @private
+ *
+ */
+appLogin = function ( data, appResponse, callback ) {
     // Set middleware config
     sqsMiddleware.set( "useremail", data.email );
     sqsMiddleware.set( "userpassword", data.password );
@@ -488,15 +504,10 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
         if ( !error ) {
             sqsLogger.log( "info", "...Logged in to Squarespace" );
 
-            fetchSiteAPIData(function () {
-                // Store time of login
-                sqsTimeOfLogin = Date.now();
+            // Keep user data in memory
+            sqsUser = data;
 
-                // End login post
-                appResponse.json({
-                    success: true
-                });
-            });
+            fetchSiteAPIData( callback );
 
         } else {
             // Handle errors
