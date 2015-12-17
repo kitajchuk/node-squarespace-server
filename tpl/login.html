@@ -150,8 +150,8 @@
         <form id="login" action="/" method="post">
             <h1>Login to Squarespace</h1>
             <p>Your user info will not be stored anywhere. This authentication simply retrieves data for your site.</p>
-            <input id="email" type="text" name="email" value="" placeholder="Email Address" />
-            <input id="password" type="password" name="password" value="" placeholder="Password" />
+            <input id="email" type="text" name="email" value="{email}" placeholder="Email Address" />
+            <input id="password" type="password" name="password" value="{password}" placeholder="Password" />
             <button type="submit" class="btn">Login</button>
         </form>
         <div id="spinner">
@@ -165,13 +165,11 @@
                 password = document.getElementById( "password" ),
                 spinner = document.getElementById( "spinner" );
 
-            /* Capture login form post */
-            login.addEventListener( "submit", function ( e ) {
-                e.preventDefault();
-
+            /* Abstract post out */
+            function postLogin () {
                 var xhr = new XMLHttpRequest();
 
-                xhr.open( "POST", this.action, true );
+                xhr.open( "POST", login.action, true );
                 xhr.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded" );
 
                 xhr.onreadystatechange = function ( e ) {
@@ -186,14 +184,27 @@
 
                 login.className = "";
                 spinner.className = "is-active";
+            }
+
+            /* Capture login form post */
+            login.addEventListener( "submit", function ( e ) {
+                e.preventDefault();
+
+                postLogin();
 
             }, false );
 
-            /* Reveal the login form */
-            setTimeout(function () {
-                login.className = "is-active";
+            /* Check for `.sqsrc` credentials */
+            if ( email.value && password.value ) {
+                postLogin();
 
-            }, 500 );
+            } else {
+                /* Reveal the login form */
+                setTimeout(function () {
+                    login.className = "is-active";
+
+                }, 500 );
+            }
         </script>
     </body>
 </html>

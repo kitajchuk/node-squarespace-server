@@ -15,6 +15,7 @@ var bodyParser = require( "body-parser" ),
     path = require( "path" ),
     fs = require( "fs" ),
     slug = require( "slug" ),
+    keytar = require( "keytar" ),
 
     browserSync = require( "browser-sync" ),
     browserSyncPort = 3000,
@@ -46,16 +47,6 @@ var bodyParser = require( "body-parser" ),
     package = sqsUtil.readJson( path.join( __dirname, "package.json" ) ),
 
     sqsUser = null,
-    sqsRcFile = path.join( process.cwd(), ".sqsrc" ),
-    sqsRcConfig = sqsUtil.isFile( sqsRcFile ) ? (function () {
-        try {
-            return sqsUtil.readJson( sqsRcFile );
-
-        } catch ( error ) {
-            return null;
-        }
-
-    })() : null,
 
 
 /**
@@ -75,7 +66,7 @@ var bodyParser = require( "body-parser" ),
  *
  */
 setServerConfig = function ( conf ) {
-    serverConfig = conf.server;
+    serverConfig = sqsUtil.copy( conf.server );
 
     serverConfig.siteurl = serverConfig.siteurl.replace( rSlash, "" );
     serverConfig.port = (serverConfig.port || 5050);
@@ -106,7 +97,7 @@ setServerConfig = function ( conf ) {
  *
  */
 setTemplateConfig = function ( conf ) {
-    templateConfig = conf;
+    templateConfig = sqsUtil.copy( conf );
 
     delete templateConfig.server;
 
@@ -417,14 +408,7 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
 
     // Authentication
     if ( !sqsUser ) {
-        if ( sqsRcConfig ) {
-            appLogin( sqsRcConfig, appResponse, function () {
-                appResponse.redirect( appRequest.params[ 0 ] );
-            });
-
-        } else {
-            appResponse.status( 200 ).send( loginHTML );
-        }
+        appResponse.status( 200 ).send( loginHTML );
 
         return;
     }
@@ -504,6 +488,8 @@ appLogin = function ( data, appResponse, callback ) {
         if ( !error ) {
             sqsLogger.log( "info", "...Logged in to Squarespace" );
 
+            saveKeytar( data );
+
             // Keep user data in memory
             sqsUser = data;
 
@@ -517,6 +503,34 @@ appLogin = function ( data, appResponse, callback ) {
             appResponse.redirect( "/" );
         }
     });
+},
+
+
+/**
+ *
+ * @method saveKeytar
+ * @param {object} data The user login info to store with keytar
+ * @private
+ *
+ */
+saveKeytar = function ( data ) {
+    // Lookup password in Keychain...
+    var password = keytar.getPassword( "SquarespacePassword", serverConfig.siteurl ),
+        email = keytar.getPassword( "SquarespaceEmail", serverConfig.siteurl );
+
+    if ( !password ) {
+        keytar.addPassword( "SquarespacePassword", serverConfig.siteurl, data.password );
+
+    } else {
+        keytar.replacePassword( "SquarespacePassword", serverConfig.siteurl, data.password );
+    }
+
+    if ( !email ) {
+        keytar.addPassword( "SquarespaceEmail", serverConfig.siteurl, data.email );
+
+    } else {
+        keytar.replacePassword( "SquarespaceEmail", serverConfig.siteurl, data.email );
+    }
 },
 
 
@@ -734,7 +748,14 @@ module.exports = {
 
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
+                var password = keytar.getPassword( "SquarespacePassword", conf.server.siteurl ),
+                    email = keytar.getPassword( "SquarespaceEmail", conf.server.siteurl );
+
                 loginHTML = sqsUtil.packStr( data );
+
+                // Render login with credentials for auto-logging in
+                loginHTML = loginHTML.replace( "{email}", (email || "") );
+                loginHTML = loginHTML.replace( "{password}", (password || "") );
             });
 
             // Preload the sqs-cache
