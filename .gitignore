@@ -15,3 +15,6 @@ npm-debug.log
 /test
 /template-compiler
 /local
+/bin/lessc
+/less-compiler
+/sqs
