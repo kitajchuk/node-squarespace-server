@@ -555,24 +555,28 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             callback( finalRender );
         });
     }
+    
+    function handleProcessed() {
+        processedQueries++;
 
-    function handleQueried() {
-        if ( processedQueries === queries.processed.length ) {
+        if ( queries.processed[ processedQueries ] ) {
+            handleQueried( queries.processed[ processedQueries ] );
+
+        } else {
             handleDone();
-            return;
         }
+    }
 
-        var query = queries.processed[ processedQueries ],
+    function handleQueried( query ) {
+        var skips = ["format", "password", "nocache", "nodata", "tag", "category"],
             cache = null,
             key = "",
             tpl = null;
 
-        processedQueries++;
-        key = ("query-" + query.queryData.collection);
+        key += ("query-" + query.queryData.collection);
 
         for ( i in qrs ) {
-            // Skip password in unique cache
-            if ( i !== "format" && i !== "password" && i !== "nocache" ) {
+            if ( skips.indexOf( i ) === -1 ) {
                 key += ("-" + i + "--" + qrs[ i ]);
             }
         }
@@ -598,10 +602,11 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
             rendered = rendered.replace( query.queryProcessed, tpl );
 
-            handleQueried();
+            handleProcessed();
 
         } else {
-            sqsMiddleware.getQuery( query.queryData, qrs, function ( error, json ) {
+            // Nocache? is the only field that should be passed along in the query string
+            sqsMiddleware.getQuery( query.queryData, (qrs.nocache ? {nocache: true} : null), function ( error, json ) {
                 if ( !error ) {
                     sqsCache.set( key, json );
 
@@ -611,7 +616,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
                     rendered = rendered.replace( query.queryProcessed, tpl );
 
-                    handleQueried();
+                    handleProcessed();
 
                 } else {
                     // Handle errors
@@ -622,7 +627,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     }
 
     if ( queries.processed.length ) {
-        handleQueried();
+        handleQueried( queries.processed[ processedQueries ] );
 
     } else {
         handleDone();
