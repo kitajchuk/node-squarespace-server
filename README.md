@@ -116,10 +116,10 @@ When you make initial requests to the pages of your site, they will likely be sl
 
 ### Release
 ***Using the latest package versions is always recommended.***
-- [node-squarespace-server@0.4.21](https://www.npmjs.com/package/node-squarespace-server)
- - [node-squarespace-jsont@0.1.22](https://www.npmjs.com/package/node-squarespace-jsont)
+- [node-squarespace-server@0.4.22](https://www.npmjs.com/package/node-squarespace-server)
+ - [node-squarespace-jsont@0.1.23](https://www.npmjs.com/package/node-squarespace-jsont)
  - [node-squarespace-logger@0.1.1](https://www.npmjs.com/package/node-squarespace-logger)
- - [node-squarespace-middleware@0.2.5](https://www.npmjs.com/package/node-squarespace-middleware)
+ - [node-squarespace-middleware@0.2.6](https://www.npmjs.com/package/node-squarespace-middleware)
  
 
 #### Recent Updates
