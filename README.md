@@ -123,6 +123,11 @@ When you make initial requests to the pages of your site, they will likely be sl
  
 
 #### Recent Updates
+- Support more predicates:
+ - `greaterThan?`
+ - `lessThan?`
+ - `greaterThanOrEqual?`
+ - `lessThanOrEqual?`
 - Save dev login with [node-keytar](https://github.com/atom/node-keytar)
 - Support the `main-content` query string format
 - Support the `or` operator with `if` statements: `{.if foo || bar || baz}`
