@@ -60,9 +60,8 @@ var path = require( "path" ),
     layoutHTML = "",
     updating = {},
 
-    // Default to unique logger incase setLogger isn't called
-    sqsLogger = require( "node-squarespace-logger" ),
-    sqsMiddleware = require( "node-squarespace-middleware" ),
+    nsl = null,
+    sqsWare = null,
     sqsUtil = require( "./squarespace-util" ),
     sqsBlocktypes = require( "./squarespace-blocktypes" ),
     sqsCollectiontypes = require( "./squarespace-collectiontypes" ),
@@ -136,7 +135,7 @@ compile = function ( cb ) {
  */
 watch = function ( cb ) {
     function doneWatch( filename ) {
-        sqsLogger.log( "template", "Reloaded local template" );
+        nsl.log( "template", "Reloaded local template" );
 
         replaceAll();
 
@@ -153,7 +152,7 @@ watch = function ( cb ) {
             if ( rItemOrList.test( filename ) || rPage.test( filename ) || rRegions.test( filename ) || rBlock.test( filename ) || rLess.test( filename ) || rCss.test( filename ) || rJs.test( filename ) ) {
                 updating[ filename ] = true;
 
-                sqsLogger.log( "template", ("Updated template file " + filename) );
+                nsl.log( "template", ("Updated template file " + filename) );
 
                 compile(function () {
                     doneWatch( filename );
@@ -209,7 +208,19 @@ refresh = function () {
  *
  */
 setLogger = function ( logger ) {
-    sqsLogger = logger;
+    nsl = logger;
+},
+
+
+/**
+ *
+ * @method setMiddleware
+ * @param {object} middleware The middleware instance
+ * @public
+ *
+ */
+setMiddleware = function ( middleware ) {
+    sqsWare = middleware;
 },
 
 
@@ -606,7 +617,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
         } else {
             // Nocache? is the only field that should be passed along in the query string
-            sqsMiddleware.getQuery( query.queryData, (qrs.nocache ? {nocache: true} : null), function ( error, json ) {
+            sqsWare.getQuery( query.queryData, (qrs.nocache ? {nocache: true} : null), function ( error, json ) {
                 if ( !error ) {
                     sqsCache.set( key, json );
 
@@ -620,7 +631,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
 
                 } else {
                     // Handle errors
-                    sqsLogger.log( "error", ("Squarespace:query request error => " + error) );
+                    nsl.log( "error", ("Squarespace:query request error => " + error) );
                 }
             });
         }
@@ -1303,7 +1314,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
         function getWidget() {
             var block = blocks.shift();
 
-            sqsMiddleware.getWidgetHtml( block, function ( error, json ) {
+            sqsWare.getWidgetHtml( block, function ( error, json ) {
                 var layout;
 
                 if ( !error ) {
@@ -1367,7 +1378,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                 } else {
                     // Handle errors
-                    sqsLogger.log( "error", ("Error requesting block widget html => " + error) );
+                    nsl.log( "error", ("Error requesting block widget html => " + error) );
 
                     // Skip it for now...
                     if ( !blocks.length ) {
@@ -1408,7 +1419,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                 blocks = [];
                 widgets = {};
 
-                sqsMiddleware.getBlockJson( blockAttrs.id, function ( error, json ) {
+                sqsWare.getBlockJson( blockAttrs.id, function ( error, json ) {
                     if ( !error ) {
                         blockData = json;
 
@@ -1449,7 +1460,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
 
                     } else {
                         // Handle errors
-                        sqsLogger.log( "error", ("Error requesting block json => " + error) );
+                        nsl.log( "error", ("Error requesting block json => " + error) );
 
                         if ( !matched.length ) {
                             callback( rendered );
@@ -1504,6 +1515,7 @@ module.exports = {
     setUser: setUser,
     setConfig: setConfig,
     setLogger: setLogger,
+    setMiddleware: setMiddleware,
     getSiteCss: getSiteCss,
     replaceBlocks: replaceBlocks,
     replaceScripts: replaceScripts,

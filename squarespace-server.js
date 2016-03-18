@@ -39,8 +39,9 @@ var bodyParser = require( "body-parser" ),
     expressApp = express(),
     loginHTML = "",
 
-    sqsLogger = require( "node-squarespace-logger" ),
-    sqsMiddleware = require( "node-squarespace-middleware" ),
+    nsl = require( "node-squarespace-logger" ),
+    nsm = require( "node-squarespace-middleware" ),
+    sqsWare = new nsm.Middleware(),
     sqsUtil = require( "./squarespace-util" ),
     sqsTemplate = require( "./squarespace-template" ),
     sqsCache = require( "./squarespace-cache" ),
@@ -75,14 +76,14 @@ setServerConfig = function ( conf ) {
     serverConfig.siteData = {};
 
     // Set config for middleware
-    sqsMiddleware.set( "siteurl", serverConfig.siteurl );
+    sqsWare.set( "siteurl", serverConfig.siteurl );
 
     if ( serverConfig.password ) {
-        sqsMiddleware.set( "sitepassword", serverConfig.password );
+        sqsWare.set( "sitepassword", serverConfig.password );
     }
 
     if ( serverConfig.sandbox ) {
-        sqsMiddleware.set( "sandboxmode", true );
+        sqsWare.set( "sandboxmode", true );
     }
 
     sqsTemplate.setConfig( "server", serverConfig );
@@ -183,7 +184,7 @@ renderResponse = function ( appRequest, appResponse ) {
             appResponse.status( 200 ).send( cacheHtml );
 
         } else {
-            sqsMiddleware.getHtml( url, qrs, function ( error, data ) {
+            sqsWare.getHtml( url, qrs, function ( error, data ) {
                 if ( !error ) {
                     appResponse.status( 200 ).send( data.html );
 
@@ -191,7 +192,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsLogger.log( "error", ("Error requesting system search page => " + error) );
+                    nsl.log( "error", ("Error requesting system search page => " + error) );
                 }
             });
         }
@@ -217,7 +218,7 @@ renderResponse = function ( appRequest, appResponse ) {
             appResponse.status( 200 ).json( cacheJson );
 
         } else {
-            sqsMiddleware.getJson( url, qrs, function ( error, json ) {
+            sqsWare.getJson( url, qrs, function ( error, json ) {
                 if ( !error ) {
                     json.json.nodeServer = true;
 
@@ -227,7 +228,7 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsLogger.log( "error", ("Error requesting page json => " + error) );
+                    nsl.log( "error", ("Error requesting page json => " + error) );
                 }
             });
         }
@@ -240,7 +241,7 @@ renderResponse = function ( appRequest, appResponse ) {
             appResponse.status( 200 ).send( cacheHtml );
 
         } else {
-            sqsMiddleware.getHtml( url, qrs, function ( error, data ) {
+            sqsWare.getHtml( url, qrs, function ( error, data ) {
                 if ( !error ) {
                     appResponse.status( 200 ).send( data.html );
 
@@ -248,14 +249,14 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 } else {
                     // Handle errors
-                    sqsLogger.log( "error", ("Error requesting main-content for page => " + error) );
+                    nsl.log( "error", ("Error requesting main-content for page => " + error) );
                 }
             });
         }
 
     // Request page?
     } else {
-        sqsMiddleware.getJsonAndHtml( url, qrs, function ( error, data ) {
+        sqsWare.getJsonAndHtml( url, qrs, function ( error, data ) {
             if ( !error ) {
                 sqsCache.set( (cacheName + ".json"), data.json.json );
                 sqsCache.set( (cacheName + ".html"), data.html.html );
@@ -266,13 +267,13 @@ renderResponse = function ( appRequest, appResponse ) {
 
             } else {
                 // Handle errors
-                sqsLogger.log( "error", ("Error requesting page => " + error) );
+                nsl.log( "error", ("Error requesting page => " + error) );
 
                 // Could be a 404 though so serve it
                 if ( data.html.status === 404 || data.json.status === 404 ) {
                     appResponse.status( 200 ).send( data.html.html );
 
-                    sqsLogger.log( "warn", ("Request responded with server code 404 for => `" + url + "`") );
+                    nsl.log( "warn", ("Request responded with server code 404 for => `" + url + "`") );
 
                     return;
                 }
@@ -381,9 +382,9 @@ onExpressRouterGET = function ( appRequest, appResponse ) {
     // Exit clause...
     if ( rApi.test( appRequest.params[ 0 ] ) ) {
         apiQuery = appRequest.query;
-        apiQuery.crumb = sqsMiddleware.getCrumb();
+        apiQuery.crumb = sqsWare.getCrumb();
 
-        sqsMiddleware.getJson( appRequest.params[ 0 ], apiQuery, function ( error, data ) {
+        sqsWare.getJson( appRequest.params[ 0 ], apiQuery, function ( error, data ) {
             if ( !error ) {
                 appResponse.set( "Content-Type", "application/json" ).status( data.status ).send( data.json );
             }
@@ -475,18 +476,18 @@ onExpressRouterPOST = function ( appRequest, appResponse ) {
  */
 appLogin = function ( data, appResponse, callback ) {
     // Set middleware config
-    sqsMiddleware.set( "useremail", data.email );
-    sqsMiddleware.set( "userpassword", data.password );
+    sqsWare.set( "useremail", data.email );
+    sqsWare.set( "userpassword", data.password );
 
     // Set user on external modules
     sqsTemplate.setUser( sqsUser );
 
-    sqsLogger.log( "info", "Logging into Squarespace..." );
+    nsl.log( "info", "Logging into Squarespace..." );
 
     // Login to site
-    sqsMiddleware.doLogin(function ( error, headers ) {
+    sqsWare.doLogin(function ( error, headers ) {
         if ( !error ) {
-            sqsLogger.log( "info", "...Logged in to Squarespace" );
+            nsl.log( "info", "...Logged in to Squarespace" );
 
             saveKeytar( data );
 
@@ -497,7 +498,7 @@ appLogin = function ( data, appResponse, callback ) {
 
         } else {
             // Handle errors
-            sqsLogger.log( "error", ("Error logging into Squarespace => " + error) );
+            nsl.log( "error", ("Error logging into Squarespace => " + error) );
 
             // Reload login
             appResponse.redirect( "/" );
@@ -542,12 +543,12 @@ saveKeytar = function ( data ) {
  *
  */
 fetchSiteAPIData = function ( callback ) {
-    sqsLogger.log( "info", "Fetching data from Squarespace..." );
+    nsl.log( "info", "Fetching data from Squarespace..." );
 
     // Fetch site API data
-    sqsMiddleware.getAPIData( function ( error, data ) {
+    sqsWare.getAPIData( function ( error, data ) {
         if ( !error ) {
-            sqsLogger.log( "info", "...Fetched data from Squarespace" );
+            nsl.log( "info", "...Fetched data from Squarespace" );
 
             // Store the site data needed
             serverConfig.siteData = data;
@@ -561,7 +562,7 @@ fetchSiteAPIData = function ( callback ) {
 
         } else {
             // Handle errors
-            sqsLogger.log( "error", ("Error fetching data from Squarespace => " + error) );
+            nsl.log( "error", ("Error fetching data from Squarespace => " + error) );
         }
     });
 },
@@ -603,7 +604,7 @@ printUsage = function () {
  *
  */
 printVersion = function () {
-    sqsLogger.log( "info", (package.title + " version " + package.version) );
+    nsl.log( "info", (package.title + " version " + package.version) );
     process.exit();
 },
 
@@ -639,14 +640,14 @@ processArguments = function ( args, cb ) {
 
     // Silence is golden
     if ( flags.quiet ) {
-        sqsLogger.log( "server", "Squarespace server running in silent mode" );
-        sqsLogger.silence();
+        nsl.log( "server", "Squarespace server running in silent mode" );
+        nsl.silence();
     }
 
     // Livereload
     if ( flags.reload ) {
         serverConfig.reload = true;
-        sqsLogger.log( "server", "Squarespace server running in livereload mode" );
+        nsl.log( "server", "Squarespace server running in livereload mode" );
     }
 
     // Order of operations
@@ -662,7 +663,7 @@ processArguments = function ( args, cb ) {
             flags.port = Number( flags.port );
 
             if ( flags.port === browserSyncPort ) {
-                sqsLogger.log( "error", ("You cannot use the same port as browser-sync: " + browserSyncPort) );
+                nsl.log( "error", ("You cannot use the same port as browser-sync: " + browserSyncPort) );
                 process.exit();
 
             } else {
@@ -713,7 +714,7 @@ startServer = function () {
     });
 
     // Log that the server is running
-    sqsLogger.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
+    nsl.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
 };
 
 
@@ -743,8 +744,9 @@ module.exports = {
         // If Callback runs, start the server
         processArguments( args, function () {
             // Pass the logger to other modules
-            sqsCache.setLogger( sqsLogger );
-            sqsTemplate.setLogger( sqsLogger );
+            sqsCache.setLogger( nsl );
+            sqsTemplate.setLogger( nsl );
+            sqsTemplate.setMiddleware( sqsWare );
 
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
@@ -774,7 +776,7 @@ module.exports = {
 
             // Watch for changes to template.conf and reload it
             fs.watchFile( templateConfigPath, function () {
-                sqsLogger.log( "template", "Reloaded template.conf json" );
+                nsl.log( "template", "Reloaded template.conf json" );
 
                 sqsUtil.readJson( templateConfigPath, function ( data ) {
                     setTemplateConfig( data );
