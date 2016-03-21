@@ -848,7 +848,7 @@ compileStylesheets = function ( cb ) {
                                 siteCss += css;
 
                             } else {
-                                sqsLogger.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
+                                nsl.log( "warn", ("Issue compiling less file `" + style.name + "` => " + error.message) );
                             }
 
                             read();
