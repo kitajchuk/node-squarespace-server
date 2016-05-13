@@ -18,3 +18,4 @@ npm-debug.log
 /bin/lessc
 /less-compiler
 /sqs
+/tpl/404*

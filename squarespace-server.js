@@ -15,10 +15,8 @@ var bodyParser = require( "body-parser" ),
     path = require( "path" ),
     fs = require( "fs" ),
     slug = require( "slug" ),
-    keytar = require( "keytar" ),
-
-    browserSync = require( "browser-sync" ),
-    browserSyncPort = 3000,
+    xkeychain = require( "xkeychain" ),
+    open = require( "open" ),
 
     rJson = /^json/,
     rIndex = /^index/,
@@ -489,7 +487,7 @@ appLogin = function ( data, appResponse, callback ) {
         if ( !error ) {
             nsl.log( "info", "...Logged in to Squarespace" );
 
-            saveKeytar( data );
+            saveCredentials( data );
 
             // Keep user data in memory
             sqsUser = data;
@@ -509,29 +507,42 @@ appLogin = function ( data, appResponse, callback ) {
 
 /**
  *
- * @method saveKeytar
- * @param {object} data The user login info to store with keytar
+ * @method saveCredentials
+ * @param {object} data The user login info to store with xkeychain
  * @private
  *
  */
-saveKeytar = function ( data ) {
-    // Lookup password in Keychain...
-    var password = keytar.getPassword( "SquarespacePassword", serverConfig.siteurl ),
-        email = keytar.getPassword( "SquarespaceEmail", serverConfig.siteurl );
+saveCredentials = function ( data ) {
+    // Lookup email/password in Keychain...
+    xkeychain.getPassword({
+        account: "SquarespacePassword",
+        service: "SquarespacePassword"
 
-    if ( !password ) {
-        keytar.addPassword( "SquarespacePassword", serverConfig.siteurl, data.password );
+    }, function ( error, password ) {
+        if ( error ) {
+            xkeychain.setPassword({
+                account: "SquarespacePassword",
+                service: "SquarespacePassword",
+                password: data.password
 
-    } else {
-        keytar.replacePassword( "SquarespacePassword", serverConfig.siteurl, data.password );
-    }
+            }, function () {});
+        }
+    });
 
-    if ( !email ) {
-        keytar.addPassword( "SquarespaceEmail", serverConfig.siteurl, data.email );
+    xkeychain.getPassword({
+        account: "SquarespaceEmail",
+        service: "SquarespaceEmail"
 
-    } else {
-        keytar.replacePassword( "SquarespaceEmail", serverConfig.siteurl, data.email );
-    }
+    }, function ( error, email ) {
+        if ( error ) {
+            xkeychain.setPassword({
+                account: "SquarespaceEmail",
+                service: "SquarespaceEmail",
+                password: data.email
+
+            }, function () {});
+        }
+    });
 },
 
 
@@ -589,7 +600,6 @@ printUsage = function () {
     console.log( "sqs --fornever   Stop server started with forever" );
     console.log( "sqs --port=XXXX  Use the specified port" );
     console.log( "sqs --quiet      Silence the logger" );
-    console.log( "sqs --reload     Reload the webpage when template changes" );
     console.log();
     console.log( "Examples:" );
     console.log( "sqs server --port=8000" );
@@ -662,29 +672,10 @@ processArguments = function ( args, cb ) {
         if ( flags.port ) {
             flags.port = Number( flags.port );
 
-            if ( flags.port === browserSyncPort ) {
-                nsl.log( "error", ("You cannot use the same port as browser-sync: " + browserSyncPort) );
-                process.exit();
-
-            } else {
-                serverConfig.port = flags.port;
-            }
+            serverConfig.port = flags.port;
         }
 
         cb();
-    }
-},
-
-
-/**
- *
- * @method reloadServer
- * @private
- *
- */
-reloadServer = function () {
-    if ( serverConfig.reload ) {
-        browserSync.reload();
     }
 },
 
@@ -700,18 +691,13 @@ startServer = function () {
     expressApp.use( express.static( serverConfig.webroot ) );
     expressApp.use( bodyParser.json() );
     expressApp.use( bodyParser.urlencoded( {extended: true} ) );
-    expressApp.set( "port", browserSyncPort );
+    expressApp.set( "port", serverConfig.port );
     expressApp.get( "*", onExpressRouterGET );
     expressApp.post( "/", onExpressRouterPOST );
-    expressApp.listen( browserSyncPort );
+    expressApp.listen( serverConfig.port );
 
-    browserSync.init( null, {
-        open: true,
-        port: serverConfig.port,
-        proxy: ("localhost:" + browserSyncPort),
-        notify: false,
-        logLevel: "silent"
-    });
+    // Open the browser tab
+    open( ("http://localhost:" + serverConfig.port) );
 
     // Log that the server is running
     nsl.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
@@ -750,14 +736,23 @@ module.exports = {
 
             // Prefetch the login page HTML
             sqsUtil.readFile( path.join( __dirname, "tpl/login.html" ), function ( data ) {
-                var password = keytar.getPassword( "SquarespacePassword", conf.server.siteurl ),
-                    email = keytar.getPassword( "SquarespaceEmail", conf.server.siteurl );
-
                 loginHTML = sqsUtil.packStr( data );
 
-                // Render login with credentials for auto-logging in
-                loginHTML = loginHTML.replace( "{email}", (email || "") );
-                loginHTML = loginHTML.replace( "{password}", (password || "") );
+                xkeychain.getPassword({
+                    account: "SquarespacePassword",
+                    service: "SquarespacePassword"
+
+                }, function ( error, password ) {
+                    loginHTML = loginHTML.replace( "{password}", (password || "") );
+                });
+
+                xkeychain.getPassword({
+                    account: "SquarespaceEmail",
+                    service: "SquarespaceEmail"
+
+                }, function ( error, email ) {
+                    loginHTML = loginHTML.replace( "{email}", (email || "") );
+                });
             });
 
             // Preload the sqs-cache
@@ -767,7 +762,7 @@ module.exports = {
                 sqsTemplate.compile(function () {
                     // Watch for template changes
                     sqsTemplate.watch(function () {
-                        reloadServer();
+                        // What?
                     });
 
                     startServer();
@@ -780,8 +775,6 @@ module.exports = {
 
                 sqsUtil.readJson( templateConfigPath, function ( data ) {
                     setTemplateConfig( data );
-
-                    reloadServer();
                 });
             });
         });

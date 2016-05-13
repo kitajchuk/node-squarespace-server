@@ -67,9 +67,6 @@ sqs --version
 # Run the server
 sqs server
 
-# Run the server with livereload
-sqs server --reload
-
 # Run the server with forever
 sqs server --forever
 
