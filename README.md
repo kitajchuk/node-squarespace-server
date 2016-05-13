@@ -113,56 +113,10 @@ When you make initial requests to the pages of your site, they will likely be sl
 
 ### Release
 ***Using the latest package versions is always recommended.***
-- [node-squarespace-server@0.4.23](https://www.npmjs.com/package/node-squarespace-server)
+- [node-squarespace-server@0.5.0](https://www.npmjs.com/package/node-squarespace-server)
  - [node-squarespace-jsont@0.1.23](https://www.npmjs.com/package/node-squarespace-jsont)
  - [node-squarespace-logger@0.1.1](https://www.npmjs.com/package/node-squarespace-logger)
  - [node-squarespace-middleware@0.3.0](https://www.npmjs.com/package/node-squarespace-middleware)
- 
-
-#### Recent Updates
-- Support more predicates:
- - `greaterThan?`
- - `lessThan?`
- - `greaterThanOrEqual?`
- - `lessThanOrEqual?`
-- Save dev login with [node-keytar](https://github.com/atom/node-keytar)
-- Support the `main-content` query string format
-- Support the `or` operator with `if` statements: `{.if foo || bar || baz}`
-- Support the `index?` predicate for templates
-- Add `?nodata` query string support to re-fetch site layout
-- Fix bug in rendering `disabled` links in navigations
-- Fix bug in setting `folderActive` for navigation context's
-- Fix bug in capturing `externalLinks` in navigation render
-- Fix bug in replicating a folder root uri
-- Support more predicates:
- - `image?`
- - `passthrough?`
- - `comments?`
- - `folder?`
- - `location?`
- - `video?`
-- Support more formatters:
- - `smartypants`
- - `pluralize` 
- - `comment-count`
- - `comment-link`
- - `like-button`
- - `social-button`
- - `social-button-inline`
- - `product-status`
- - `product-price`
- - `product-checkout`
-- Implement livereload with [browser-sync](https://github.com/BrowserSync/browser-sync)
-- Provide a sandbox dev hook in JSONT, `nodeServer`
-- Better naming convention for local .sqs-cache
-- Catch and handle redirect for clickthroughUrl's
-- [Support recursive section/repeated section context in JSONT](https://github.com/kitajchuk/node-squarespace-jsont/commit/1e1dc86d56e3e713e4d4c3c4af3fc59d6ba3cd55)
-- Support parsing block partials inside of other block partials
-- Support template lookup when regionKey seems invalid
-- Integrate better logging using [node-squarespace-logger](https://github.com/kitajchuk/node-squarespace-logger)
-- Support folder-navigation tag
-- Support static pages
-- Support system search page
 
 
 
