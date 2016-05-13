@@ -79,6 +79,9 @@ sqs server --port=8000
 # Silence the server logging
 sqs server --quiet
 
+# Open new tab in browser
+sqs server --open
+
 # Bust local cache
 sqs buster
 ```

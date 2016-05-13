@@ -84,6 +84,10 @@ setServerConfig = function ( conf ) {
         sqsWare.set( "sandboxmode", true );
     }
 
+    if ( serverConfig.fulldata !== undefined ) {
+        sqsWare.set( "fulldata", serverConfig.fulldata );
+    }
+
     sqsTemplate.setConfig( "server", serverConfig );
 },
 
@@ -600,6 +604,7 @@ printUsage = function () {
     console.log( "sqs --fornever   Stop server started with forever" );
     console.log( "sqs --port=XXXX  Use the specified port" );
     console.log( "sqs --quiet      Silence the logger" );
+    console.log( "sqs --open       Open a new tab for the server when it starts" );
     console.log();
     console.log( "Examples:" );
     console.log( "sqs server --port=8000" );
@@ -654,10 +659,9 @@ processArguments = function ( args, cb ) {
         nsl.silence();
     }
 
-    // Livereload
-    if ( flags.reload ) {
-        serverConfig.reload = true;
-        nsl.log( "server", "Squarespace server running in livereload mode" );
+    // Open website tab
+    if ( flags.open ) {
+        serverConfig.open = true;
     }
 
     // Order of operations
@@ -697,7 +701,9 @@ startServer = function () {
     expressApp.listen( serverConfig.port );
 
     // Open the browser tab
-    open( ("http://localhost:" + serverConfig.port) );
+    if ( serverConfig.open ) {
+        open( ("http://localhost:" + serverConfig.port) );
+    }
 
     // Log that the server is running
     nsl.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
