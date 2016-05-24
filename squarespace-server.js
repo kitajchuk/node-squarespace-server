@@ -36,6 +36,7 @@ var bodyParser = require( "body-parser" ),
     templateConfigPath = path.join( process.cwd(), "template.conf" ),
     expressApp = express(),
     loginHTML = "",
+    pageNotFoundJson = null,
 
     nsl = require( "node-squarespace-logger" ),
     nsm = require( "node-squarespace-middleware" ),
@@ -170,6 +171,11 @@ renderResponse = function ( appRequest, appResponse ) {
     cacheHtml = sqsCache.get( (cacheName + ".html") );
     cacheJson = sqsCache.get( (cacheName + ".json") );
 
+    // 404 JSON?
+    if ( cacheJson && !pageNotFoundJson ) {
+        setPageNotFoundJson( cacheJson );
+    }
+
     // Nocache?
     if ( appRequest.query.nocache !== undefined ) {
         cacheJson = null;
@@ -263,6 +269,11 @@ renderResponse = function ( appRequest, appResponse ) {
                 sqsCache.set( (cacheName + ".json"), data.json.json );
                 sqsCache.set( (cacheName + ".html"), data.html.html );
 
+                // 404 JSON?
+                if ( !pageNotFoundJson ) {
+                    setPageNotFoundJson( data.json.json );
+                }
+
                 sqsTemplate.renderTemplate( qrs, data.json.json, sqsCache.get( (cacheName + ".html") ), function ( tpl ) {
                     appResponse.status( 200 ).send( tpl );
                 });
@@ -273,7 +284,10 @@ renderResponse = function ( appRequest, appResponse ) {
 
                 // Could be a 404 though so serve it
                 if ( data.html.status === 404 || data.json.status === 404 ) {
-                    appResponse.status( 200 ).send( data.html.html );
+                    //appResponse.status( 200 ).send( data.html.html );
+                    sqsTemplate.renderTemplate( qrs, pageNotFoundJson, data.html.html, function ( tpl ) {
+                        appResponse.status( 404 ).send( tpl );
+                    });
 
                     nsl.log( "warn", ("Request responded with server code 404 for => `" + url + "`") );
 
@@ -282,6 +296,20 @@ renderResponse = function ( appRequest, appResponse ) {
             }
         });
     }
+},
+
+
+/**
+ *
+ * @method setPageNotFoundJson
+ * @param {object} json The JSON to make 404 JSON from
+ * @private
+ *
+ */
+setPageNotFoundJson = function ( json ) {
+    pageNotFoundJson = sqsUtil.copy( json );
+    pageNotFoundJson.collection = {};
+    pageNotFoundJson.error = true;
 },
 
 
