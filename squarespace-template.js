@@ -42,8 +42,10 @@ var path = require( "path" ),
     SQS_FOOTERS = "{squarespace-footers}",
     SQS_MAIN_CONTENT = "{squarespace.main-content}",
     SQS_PAGE_CLASSES = "{squarespace.page-classes}",
-    SQS_PAGE_ID = /\{squarespace\.page-id\}|squarespace\.page-id/g,
     SQS_POST_ENTRY = "{squarespace-post-entry}",
+    SQS_PAGE_ID = /\{squarespace\.page-id\}|squarespace\.page-id/g,
+    SQS_TEMP_REV = /\{squarespace\.template-revision\}/g,
+    SQS_PAGE_TITLE = /\{squarespace\.page-title\}/g,
     sqsHeaders = [],
     sqsFooters = [],
     sqsUser = null,
@@ -561,6 +563,9 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             rendered = rendered.replace( scripts[ i ].token, scripts[ i ].script );
         }
 
+        // Render squarespace tags like {squarespace.page-id} etc...
+        rendered = replaceSQSTags( rendered, pageJson, pageHtml );
+
         // Render Block Fields
         replaceBlockFields( rendered, qrs, function ( finalRender ) {
             callback( finalRender );
@@ -882,6 +887,14 @@ replaceSQSTags = function ( rendered, pageJson, pageHtml ) {
     rendered = rendered.replace( SQS_POST_ENTRY, "" );
     rendered = rendered.replace( SQS_PAGE_CLASSES, bodyAttr.class );
     rendered = rendered.replace( SQS_PAGE_ID, (pageType + "-" + pageId) );
+    rendered = rendered.replace( SQS_TEMP_REV, Date.now() );
+
+    if ( pageJson.item ) {
+        rendered = rendered.replace( SQS_PAGE_TITLE, pageJson.websiteSettings.itemTitleFormat.replace( "%i", pageJson.item.title ).replace( "%c", pageJson.collection.title ).replace( "%s", pageJson.website.siteTitle ) );
+
+    } else {
+        rendered = rendered.replace( SQS_PAGE_TITLE, (pageJson.collection.homepage ? pageJson.websiteSettings.homepageTitleFormat : pageJson.websiteSettings.collectionTitleFormat).replace( "%c", pageJson.collection.title ).replace( "%s", pageJson.website.siteTitle ) );
+    }
 
     return rendered;
 },
