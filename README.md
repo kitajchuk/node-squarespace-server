@@ -82,6 +82,9 @@ sqs server --quiet
 # Open new tab in browser
 sqs server --open
 
+# Impersonate a Squarespace authenticateAccount session
+sqs server --auth
+
 # Bust local cache
 sqs buster
 ```
@@ -111,6 +114,11 @@ You will first be prompted with a login page. Enter your email and password for 
 
 ### Performance and Caching
 When you make initial requests to the pages of your site, they will likely be slow. Imagine why. For every page the module needs to request both full `html` (for headers and footers parsing) and `json` (for rendering). That's 2 requests. For every `squarespace:query` and `squarespace:block-field` tag the module must make another request. Well, that's a lot of requests for sure. Luckily, the module caches everything via a `.sqs-cache` directory in your template root. This is good to speed things up. But, sometimes you want to pull down the latest and greatest content from your site. You can do this by hitting any page with a `?nocache` query string. To blow away your entire cache you can either delete it manually or use the `sqs buster` command.
+
+
+
+### Squarespace authenticatedAccount JSON
+When logged in to a Squarespace website, Squarespace adds an `authenticatedAccount` JSON object. This object is useful for creating conditional template code that renders only when logged in to Squarespace's backend config. This is common for automatically swapping out minified JavaScript links, Squarespace script comboing, or anything you want hidden to the public but displayed in the backend. Using the node-squarespace-server `--auth` arugment will allow you to move between `authenticatedAccount` states.
 
 
 
