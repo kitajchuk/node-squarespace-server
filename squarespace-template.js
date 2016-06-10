@@ -465,6 +465,11 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     // Unique page JSON property for sandbox dev mode
     pageJson.nodeServer = true;
 
+    // Remote authenticatedAccount JSON key from rendered template during CLI auth arugment.
+    if ( config.server.auth ) {
+        delete pageJson.authenticatedAccount;
+    }
+
     // Create {squarespace-headers} / {squarespace-footers}
     setHeaderFooterTokens( pageJson, pageHtml );
 
@@ -571,7 +576,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
             callback( finalRender );
         });
     }
-    
+
     function handleProcessed() {
         processedQueries++;
 
@@ -1384,7 +1389,7 @@ replaceBlockFields = function ( rendered, qrs, callback ) {
                         } else {
                             getBlocks();
                         }
-                        
+
                     } else {
                         getWidget();
                     }
