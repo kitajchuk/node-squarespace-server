@@ -692,6 +692,11 @@ processArguments = function ( args, cb ) {
         serverConfig.open = true;
     }
 
+    // Set Squarespace authentication impersonation status.
+    if ( flags.auth ) {
+        serverConfig.auth = true;
+    }
+
     // Order of operations
     if ( flags.version ) {
         printVersion();
