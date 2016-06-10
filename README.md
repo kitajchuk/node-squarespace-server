@@ -118,7 +118,7 @@ When you make initial requests to the pages of your site, they will likely be sl
 
 
 ### Squarespace authenticatedAccount JSON
-When logged in to a Squarespace website, Squarespace adds an `authenticatedAccount` JSON object. This object is useful for creating conditional template code that renders only when logged in to Squarespace's backend config. This is common for automatically swapping out minified JavaScript links, Squarespace script comboing, or anything you want hidden to the public but displayed in the backend. Using the node-squarespace-server `--auth` arugment will allow you to move between `authenticatedAccount` states.
+When logged in to a Squarespace website, Squarespace adds an `authenticatedAccount` JSON object. This object is useful for creating conditional template code that renders only when logged in to Squarespace's backend config. This is common for automatically swapping out minified JavaScript links, Squarespace script combo-ing, or anything you want hidden to the public but displayed in the backend. Using the node-squarespace-server `--auth` arugment will allow you to move between `authenticatedAccount` states.
 
 
 

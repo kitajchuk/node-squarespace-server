@@ -466,7 +466,7 @@ renderTemplate = function ( qrs, pageJson, pageHtml, callback ) {
     pageJson.nodeServer = true;
 
     // Remove authenticatedAccount JSON key from rendered template during CLI auth arugment.
-    if ( config.server.auth ) {
+    if ( !config.server.auth ) {
         delete pageJson.authenticatedAccount;
     }
 
