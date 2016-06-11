@@ -122,6 +122,18 @@ When logged in to a Squarespace website, Squarespace adds an `authenticatedAccou
 
 
 
+### Server-specific Template Code
+The node-squarespace-server adds a new JSON key to the root Squarespace template JSON that allows you to write JSON-T template code that while only execute in your node server environment. To use it, simply use a Squarespace `.if` statement as specified in the [official documentation](https://developers.squarespace.com/templating-basics/). Because this JSON key is unsupported by Squarespace's own JSON-T dictionary, your code will never be seen on your production Squarespace template. 
+
+Example usage:
+
+```html
+{.if nodeServer}
+    <!-- Template code only seen on your local server. -->
+{.end}
+```
+
+
 ### Release
 ***Using the latest package versions is always recommended.***
 - [node-squarespace-server@0.5.0](https://www.npmjs.com/package/node-squarespace-server)
