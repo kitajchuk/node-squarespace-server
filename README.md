@@ -82,7 +82,7 @@ sqs server --quiet
 # Open new tab in browser
 sqs server --open
 
-# Impersonate a Squarespace authenticateAccount session
+# Change Squarespace authenticateAccount state
 sqs server --auth
 
 # Bust local cache
@@ -120,6 +120,18 @@ When you make initial requests to the pages of your site, they will likely be sl
 ### Squarespace authenticatedAccount JSON
 When logged in to a Squarespace website, Squarespace adds an `authenticatedAccount` JSON object. This object is useful for creating conditional template code that renders only when logged in to Squarespace's backend config. This is common for automatically swapping out minified JavaScript links, Squarespace script combo-ing, or anything you want hidden to the public but displayed in the backend. Using the node-squarespace-server `--auth` arugment will allow you to move between `authenticatedAccount` states.
 
+
+
+### Server-specific Template Code
+The node-squarespace-server adds a new JSON key to the root Squarespace template JSON that allows you to write JSON-T template code that will only execute in your node server environment. To use it, simply use a Squarespace `.if` statement as specified in the [official documentation](https://developers.squarespace.com/templating-basics/). Because this JSON key is unsupported by Squarespace's own JSON-T dictionary, your code will never be seen on your production Squarespace template. 
+
+Example usage:
+
+```html
+{.if nodeServer}
+    <!-- Template code only seen on your local server. -->
+{.end}
+```
 
 
 ### Release

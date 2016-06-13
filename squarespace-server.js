@@ -738,6 +738,11 @@ startServer = function () {
         open( ("http://localhost:" + serverConfig.port) );
     }
 
+    // Log authenticatedAccount state
+    if ( serverConfig.auth ) {
+        nsl.log( "template", "Adding {authenticatedAccount} JSON to template" );
+    }
+
     // Log that the server is running
     nsl.log( "server", ("Squarespace server running localhost:" + serverConfig.port) );
 };
