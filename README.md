@@ -22,29 +22,21 @@ npm update -g node-squarespace-server
 
 
 ### Usage
-Navigate to your [Squarespace](http://squarespace.com) developer template and add to your `template.conf` file:
+Navigate to your [Squarespace](http://squarespace.com) developer template and add to your `template.conf` file. These are config settings that are used for the [middleware](https://github.com/NodeSquarespace/node-squarespace-middleware).
 
-```json
+```js
 "server": {
-    "siteurl": "https://yoursite.squarespace.com"
-}
-```
-
-If you are using a site-wide password, then you would have the following:
-
-```json
-"server": {
+    // Your squarespace domain
     "siteurl": "https://yoursite.squarespace.com",
-    "password": "yoursitewidepassword"
-}
-```
 
-If you are running a site in sandbox trial mode, then you would have the following:
-
-```json
-"server": {
-    "siteurl": "https://yoursite.squarespace.com",
-    "sandbox": true
+    // If you are using a site-wide password
+    "password": "yoursitewidepassword",
+    
+    // If you are in trial mode with your site
+    "sandbox": true,
+    
+    // If you don't need full collection json data in navigation templates
+    "fulldata": false
 }
 ```
 
@@ -82,7 +74,7 @@ sqs server --quiet
 # Open new tab in browser
 sqs server --open
 
-# Change Squarespace authenticateAccount state
+# Change Squarespace authenticatedAccount state
 sqs server --auth
 
 # Bust local cache
@@ -136,7 +128,7 @@ Example usage:
 
 ### Release
 ***Using the latest package versions is always recommended.***
-- [node-squarespace-server@0.5.0](https://www.npmjs.com/package/node-squarespace-server)
+- [node-squarespace-server@0.5.43](https://www.npmjs.com/package/node-squarespace-server)
  - [node-squarespace-jsont@0.1.23](https://www.npmjs.com/package/node-squarespace-jsont)
  - [node-squarespace-logger@0.1.1](https://www.npmjs.com/package/node-squarespace-logger)
  - [node-squarespace-middleware@0.3.0](https://www.npmjs.com/package/node-squarespace-middleware)
